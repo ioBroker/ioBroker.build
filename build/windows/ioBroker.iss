@@ -5,8 +5,8 @@
 #define MyAppShortName "ioBroker"
 #define MyAppLCShortName "iobroker"
 #define MyAppVersion "@@version"
-#define MyAppPublisher "ioBroker.com"
-#define MyAppURL "http://ioBroker.com/"
+#define MyAppPublisher "ioBroker.org"
+#define MyAppURL "http://ioBroker.org/"
 #define MyAppIcon "ioBroker.ico"
 
 
@@ -44,10 +44,11 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 
 
 [Files]
-Source: "v0.10.29\node.exe"; DestDir: "{app}"; Flags: ignoreversion; Check: not Is64BitInstallMode
-Source: "v0.10.29\nodex64.exe"; DestDir: "{app}"; DestName: "node.exe"; Flags: ignoreversion; Check: Is64BitInstallMode
-Source: "v0.10.29\node.exe"; DestDir: "{app}"; Flags: ignoreversion; Check: not Is64BitInstallMode
-Source: "v0.10.29\nodex64.exe"; DestDir: "{app}"; DestName: "node.exe"; Flags: ignoreversion; Check: Is64BitInstallMode
+Source: "nodejs-v0.10.29\node.exe"; DestDir: "{app}"; Flags: ignoreversion; Check: not Is64BitInstallMode
+Source: "nodejs-v0.10.29\nodex64.exe"; DestDir: "{app}"; DestName: "node.exe"; Flags: ignoreversion; Check: Is64BitInstallMode
+Source: "redis-v2.4.6\redis-2.4.6-setup-32-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: not Is64BitInstallMode
+Source: "redis-v2.4.6\redis-2.4.6-setup-64-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: Is64BitInstallMode
+Source: "couchDB\couchDBsetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall;
 Source: "install.js"; DestDir: "{app}"; Flags: ignoreversion
 Source: "uninstall.js"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
@@ -121,15 +122,26 @@ begin
       end;
       if lang <> '' then begin
           fileName := ExpandConstant('{app}\settings-dist.json');
-          FileReplaceString(fileName, '"language": "en"', '"language": "' + lang + '"');
+          //FileReplaceString(fileName, '"language": "en"', '"language": "' + lang + '"');
       end;
     end;
+end;
+
+function RedisNeedsInstall():boolean;
+begin
+   result := not FileExists(ExpandConstant('{pf}\Redis\redis-service.exe'));
+end;
+function CouchNeedsInstall():boolean;
+begin
+   result := not FileExists(ExpandConstant('{pf32}\Apache Software Foundation\CouchDB\Install.exe'));
 end;
 
 [Run]
 ; postinstall launch
 Filename: "{app}\node.exe"; Parameters: "install.js"; Flags: runhidden;
+Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
 Filename: "{app}\service_ioBroker.bat"; Parameters: "start"; Flags: runhidden;
+Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
 ; Add Firewall Rules
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{app}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{app}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
