@@ -140,12 +140,13 @@ end;
 ; postinstall launch
 Filename: "{app}\node.exe"; Parameters: "install.js"; Flags: runhidden;
 Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
-Filename: "{app}\service_ioBroker.bat"; Parameters: "start"; Flags: runhidden;
 Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
+Filename: "{app}\install.bat"; Flags: runhidden;
+Filename: "{app}\service_ioBroker.bat"; Parameters: "start"; Flags: runhidden;
 ; Add Firewall Rules
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{app}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{app}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
-Filename: http://localhost:8080/control; Description: "Control page"; Flags: postinstall shellexec
+Filename: http://localhost:8080/admin; Description: "Control page"; Flags: postinstall shellexec
 
 [UninstallRun]
 ; Removes System Service
