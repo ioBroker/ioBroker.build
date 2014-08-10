@@ -80,7 +80,7 @@ module.exports = function (grunt) {
                     patterns: [
                         {
                             match: 'version',
-                            replacement: iocore.version
+                            replacement: '<%= grunt.task.current.args[3] %>'
                         },
                         {
                             match: 'architecture',
@@ -93,6 +93,14 @@ module.exports = function (grunt) {
                         {
                             match: "user",
                             replacement: '<%= grunt.task.current.args[1] %>'
+                        },
+                        {
+                            match: "user",
+                            replacement: '<%= grunt.task.current.args[1] %>'
+                        },
+                        {
+                            match: /"node\-windows": "\~[\.0-9]*",/g,
+                            replacement: ''
                         }
                     ]
                 },
@@ -100,22 +108,42 @@ module.exports = function (grunt) {
                     {
                         expand:  true,
                         flatten: true,
-                        src:     [gruntDir + 'debian-pi/control/*'],
+                        src:     [gruntDir + 'debian/control/*'],
                         dest:    gruntDir + '.debian-pi-control/control/'
                     },
                     {
                         expand:  true,
                         flatten: true,
-                        src:     [gruntDir + './build/debian-pi/redeb.sh'],
+                        src:     [gruntDir + 'debian/redeb.sh'],
                         dest:    gruntDir + '.debian-pi-ready/'
                     },
                     {
                         expand:  true,
                         flatten: true,
-                        src:     [gruntDir + 'debian-pi/etc/init.d/ioBroker.sh'],
+                        src:     [gruntDir + 'debian/etc/init.d/ioBroker.sh'],
                         dest:    gruntDir + '.debian-pi-control/'
                     }
                 ]
+            },
+            'debian-pi-modules': {
+                options: {
+                    force: true,
+                    patterns: [
+                        {
+                            match: /"node\-windows": "\~[\.0-9]*",/g,
+                            replacement: ''
+                        }
+                    ]
+                },
+                files: [
+                    {
+                        expand:  true,
+                        flatten: true,
+                        src:     [gruntDir + '.debian-pi-ready/sysroot/opt/ioBroker/package.json'],
+                        dest:    gruntDir + '.debian-pi-ready/sysroot/opt/ioBroker/'
+                    }
+                ]
+
             },
             windowsVersion: {
                 options: {
@@ -170,9 +198,9 @@ module.exports = function (grunt) {
                 files: [
                     {
                         expand: true,
-                        cwd: gruntDir + '.build',
-                        src: ['**/*', '!node_modules/node-windows/**/*', '!node_modules/optimist/**/*', '!node_modules/wordwrap/**/*'],
-                        dest: '.debian-pi-ready/sysroot/opt/ioBroker/'
+                        cwd: gruntDir + '../tmp/ioBroker.nodejs-master',
+                        src: ['**/*', '!*.bat', '!Gruntfile.js', '!tasks/*'],
+                        dest: gruntDir + '.debian-pi-ready/sysroot/opt/ioBroker/'
                     },
                     {
                         expand: true,
@@ -199,7 +227,7 @@ module.exports = function (grunt) {
                     {
                         expand: true,
                         cwd: gruntDir + '../tmp/ioBroker.nodejs-master',
-                        src: ['**/*', '!install.sh', '!iobroker'],
+                        src: ['**/*', '!install.sh', '!iobroker', '!Gruntfile.js', '!tasks/*'],
                         dest: gruntDir + '.windows-ready/data/'
                     },
                     {
@@ -225,6 +253,31 @@ module.exports = function (grunt) {
                 ]
             }
 
+        },
+        lineending: {               // Task
+            dist: {                   // Target
+                options: {              // Target options
+                    eol: 'lf',
+                        overwrite: true
+                },
+                files: [
+                    {
+                        expand:  true,
+                        flatten: true,
+                        src:     [gruntDir + '.debian-pi-ready/redeb.sh']
+                    },
+                    {
+                        expand:  true,
+                        flatten: true,
+                        src:     [gruntDir + '.debian-pi-control/control/*']
+                    },
+                    {
+                        expand:  true,
+                        flatten: true,
+                        src:     [gruntDir + '.debian-pi-control/ioBroker.sh']
+                    }
+                ]
+            }
         },
         compress: {
             main: {
@@ -676,67 +729,67 @@ module.exports = function (grunt) {
      'replace:core'
      ]
      };
-
-     grunt.registerTask('debian-pi-packet', function () {
-     // Calculate size of directory
-     var path = require('path');
-
-     function readDirSize(item) {
-     var stats = fs.lstatSync(item);
-     var total = stats.size;
-
-     if (stats.isDirectory()) {
-     var list = fs.readdirSync(item);
-     for (var i = 0; i < list.length; i++) {
-     total += readDirSize(path.join(item, list[i]));
-     }
-     return total;
-     } else {
-     return total;
-     }
-     }
-
-     var size = readDirSize('.build');
-
-     grunt.task.run([
-     'clean:debian-pi-control',
-     'replace:debian-pi-version:' + (Math.round(size / 1024) + 8) + ':pi:armhf', // Settings for raspbian
-     'copy:debian-pi',
-     'compress:debian-pi-data',
-     'clean:debian-pi-control-sysroot'
-     ]);
-     console.log('========= Copy .debian-pi-ready directory to Raspbery PI and start "sudo bash redeb.sh" =============');
-     });
 */
+    grunt.registerTask('debian-pi-packet', function () {
+        // Calculate size of directory
+        var path = require('path');
+
+        function readDirSize(item) {
+            var stats = fs.lstatSync(item);
+            var total = stats.size;
+
+            if (stats.isDirectory()) {
+                var list = fs.readdirSync(item);
+                for (var i = 0; i < list.length; i++) {
+                    total += readDirSize(path.join(item, list[i]));
+                }
+                return total;
+            } else {
+                return total;
+            }
+        }
+
+        var size = readDirSize('tmp/ioBroker.nodejs-master');
+        iocore = grunt.file.readJSON('tmp/ioBroker.nodejs.io-package.json');
+
+        grunt.task.run([
+            'clean:debian-pi-control',
+            'replace:debian-pi-version:' + (Math.round(size / 1024) + 8) + ':pi:armhf:' + iocore.version, // Settings for raspbian
+            'lineending',
+            'copy:debian-pi',
+            'replace:debian-pi-modules',
+            'compress:debian-pi-data',
+            'clean:debian-pi-control-sysroot'
+        ]);
+        console.log('========= Copy .debian-pi-ready directory to Raspbery PI and start "sudo bash redeb.sh" =============');
+    });
+
 
     grunt.registerTask('loadIoPackage', function () {
         iocore = grunt.file.readJSON('tmp/ioBroker.' + grunt.task.current.args[0] + '.io-package.json');
-        grunt.task.run(['replace:windowsVersion:'+iocore.version]);
+        grunt.task.run(['replace:windowsVersion:' + iocore.version]);
     });
 
-     grunt.registerTask('windows-msi', function () {
-         if (/^win/.test(process.platform)) {
-             grunt.task.run([
-                 'curl:io-package:nodejs',
-                 'loadIoPackage:nodejs',
-                 'curl:couchDB',
-                 'curl:iobroker:nodejs',
-                 'unzip:iobroker:nodejs',
-                 'copy:windows',
-                 'command:makeWindowsMSI'
-             ]);
-             console.log('========= Please wait a little (ca 1 min). The msi file will be created in ioBroker/delivery directory after the grunt is finished.');
-             console.log('========= you can start batch file .windows-ready\\createSetup.bat manually');
-             // Sometimes command:makeWindowsMSI does not work, you can start batch file manually
-             grunt.file.write(gruntDir + '.windows-ready\\createSetup.bat', '"' + gruntDir + 'windows\\InnoSetup5\\ISCC.exe" "' + gruntDir + '.windows-ready\\ioBroker.iss"');
-         } else {
-             console.log('Cannot create windows setup, while host is not windows');
-         }
-     });
+    grunt.registerTask('windows-msi', function () {
+        if (/^win/.test(process.platform)) {
+            grunt.task.run([
+                'curl:iobroker:nodejs',
+                'copy:windows',
+                'command:makeWindowsMSI'
+            ]);
+            console.log('========= Please wait a little (ca 1 min). The msi file will be created in ioBroker/delivery directory after the grunt is finished.');
+            console.log('========= you can start batch file .windows-ready\\createSetup.bat manually');
+            // Sometimes command:makeWindowsMSI does not work, you can start batch file manually
+            grunt.file.write(gruntDir + '.windows-ready\\createSetup.bat', '"' + gruntDir + 'windows\\InnoSetup5\\ISCC.exe" "' + gruntDir + '.windows-ready\\ioBroker.iss"');
+        } else {
+            console.log('Cannot create windows setup, while host is not windows');
+        }
+    });
 
-     grunt.registerTask('createJsonInfo', function () {
-        grunt.file.copy(srcDir + '/io-core.json', dstDir + 'ioBroker.core.' + iocore.version + '.json');
-     });
+
+    grunt.registerTask('createJsonInfo', function () {
+       grunt.file.copy(srcDir + '/io-core.json', dstDir + 'ioBroker.core.' + iocore.version + '.json');
+    });
 
     var gruntTasks = [
         'grunt-replace',
@@ -749,6 +802,7 @@ module.exports = function (grunt) {
         'grunt-jscs',
         'grunt-exec',
         'grunt-zip',
+        'grunt-lineending',
         'grunt-curl'
     ];
     var i;
@@ -759,7 +813,12 @@ module.exports = function (grunt) {
 
     grunt.registerTask('default', [
         'clean:all',
-        'windows-msi'
+        'curl:io-package:nodejs',
+        'loadIoPackage:nodejs',
+        'curl:couchDB',
+        'unzip:iobroker:nodejs',
+        'windows-msi',
+        'debian-pi-packet'
 /*        'exec:npm',
         'replace:core',
         'makeEmptyDirs',

@@ -3,9 +3,6 @@
 if [ ! -d "/opt/ioBroker/tmp" ]; then
   mkdir /opt/ioBroker/tmp
 fi
-if [ ! -d "/opt/ioBroker/datastore" ]; then
-  mkdir /opt/ioBroker/datastore
-fi
 if [ ! -d "/opt/ioBroker/log" ]; then
   mkdir /opt/ioBroker/log
 fi

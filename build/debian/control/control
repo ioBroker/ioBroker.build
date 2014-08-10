@@ -4,6 +4,6 @@ Section: base
 Priority: optional
 Architecture: @@architecture
 Installed-Size: @@size
-Depends:
-Maintainer: ioBroker.com <support@ioBroker.com>
+Depends: redis-server, couchdb, nodejs
+Maintainer: ioBroker.org <support@ioBroker.org>
 Description: ioBroker is automation platform on NodeJS.
