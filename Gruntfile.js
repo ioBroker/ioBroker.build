@@ -193,13 +193,19 @@ module.exports = function (grunt) {
                     {
                         expand: true,
                         cwd: gruntDir + 'windows',
-                        src: ['*.js', 'redis-*/**/*', 'couchDB*/**/*', 'nodejs-*/**/*', '*.ico', '*.bat', '!service_ioBroker.bat'],
+                        src: ['*.js', 'redis-*/**/*', 'couchDB*/**/*', 'nodejs-*/**/*', '*.ico', '*.bat', '*.cmd', '!service_ioBroker.bat'],
                         dest: gruntDir + '.windows-ready/'
                     },
                     {
                         expand: true,
                         cwd: gruntDir + '../tmp/ioBroker.nodejs-master',
                         src: ['**/*', '!install.sh', '!iobroker'],
+                        dest: gruntDir + '.windows-ready/data/'
+                    },
+                    {
+                        expand: true,
+                        cwd: gruntDir + 'windows',
+                        src: ['node-modules/**/*'],
                         dest: gruntDir + '.windows-ready/data/'
                     },
                     {
