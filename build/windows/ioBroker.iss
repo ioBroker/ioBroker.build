@@ -152,6 +152,9 @@ Filename: http://localhost:8080/; Description: "Control page"; Flags: postinstal
 [UninstallRun]
 ; Removes System Service
 Filename: "{app}\node.exe"; Parameters: "uninstall.js"; Flags: runhidden;
+Filename: "{sys}\net"; Parameters: "stop redis"; Flags: runhidden; 
+Filename: "{pf}\Redis\unins000.exe"
+Filename: "{pf32}\Apache Software Foundation\CouchDB\unins000.exe"
 
 ; Remove Firewall Rules
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node In"" program=""{app}\node.exe"""; Flags: runhidden;
@@ -160,4 +163,12 @@ Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=
 ; Remove all leftovers
 Filename: "{sys}\del"; Parameters: """{app}\daemon\*""";
 Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\daemon""";
+Filename: "{sys}\del"; Parameters: """{app}\node_modules\*""";
+Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\node_modules""";
+Filename: "{sys}\del"; Parameters: """{app}\conf\*""";
+Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\conf""";
+Filename: "{sys}\del"; Parameters: """{app}\log\*""";
+Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\log""";
+Filename: "{sys}\del"; Parameters: """{app}\adapter\*""";
+Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\adapter""";
 Filename: "{sys}\rmdir"; Parameters: "-r ""{app}""";
