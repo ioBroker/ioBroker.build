@@ -332,6 +332,10 @@ module.exports = function (grunt) {
             makeWindowsMSI: {
                 // type : 'bat',
                 cmd: '"' + gruntDir + 'windows\\InnoSetup5\\ISCC.exe" "' + gruntDir + '.windows-ready\\ioBroker.iss" > "' + gruntDir + '.windows-ready\\setup.log"'
+            },
+            makeDebian: {
+                // type : 'bat',
+                cmd: 'cd ' + gruntDir + '.debian-pi-ready; sudo sh /redeb.sh && cp ioBroker* ../../delivery/'
             }
         },
 
@@ -761,7 +765,12 @@ module.exports = function (grunt) {
             'compress:debian-pi-data',
             'clean:debian-pi-control-sysroot'
         ]);
-        console.log('========= Copy .debian-pi-ready directory to Raspbery PI and start "sudo bash redeb.sh" =============');
+        if (/^linux/.test(process.platform)) {
+            // This must be tested
+            grunt.task.run(['makeDebian']);
+        } else {
+            console.log('========= Copy .debian-pi-ready directory to Raspbery PI and start "sudo bash redeb.sh" =============');
+        }
     });
 
 

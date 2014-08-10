@@ -18,12 +18,12 @@ then
 fi
 
 # TODO test version
-if [ ! -f /usr/local/bin/node ]
-then
-  echo "Installing nodeJS..."
-  pushd /tmp
-  wget -c "http://nodejs.org/dist/v${VER}/node-v${VER}-linux-${ARCH}.tar.gz"
-  rm -rf /tmp/node-v${VER}-linux-${ARCH}
-  tar xf node-v${VER}-linux-${ARCH}.tar.gz -C /tmp/
-  cp -a /tmp/node-v${VER}-linux-${ARCH}/* /usr/local/
-fi
+#if [ ! -f /usr/local/bin/node ]
+#then
+#  echo "Installing nodeJS..."
+#  pushd /tmp
+#  wget -c "http://nodejs.org/dist/v${VER}/node-v${VER}-linux-${ARCH}.tar.gz"
+#  rm -rf /tmp/node-v${VER}-linux-${ARCH}
+#  tar xf node-v${VER}-linux-${ARCH}.tar.gz -C /tmp/
+#  cp -a /tmp/node-v${VER}-linux-${ARCH}/* /usr/local/
+#fi

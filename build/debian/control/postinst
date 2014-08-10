@@ -6,31 +6,40 @@ fi
 if [ ! -d "/opt/ioBroker/log" ]; then
   mkdir /opt/ioBroker/log
 fi
+IO_USER=$USER
 
-#Check if user @@user exists
-if [ $(cat /etc/passwd | grep "/home" |cut -d: -f1 | grep '^pi$' | wc -l) -eq 0 ]
-then
-    read -p "User pi does not exist. Create?" yn
-    case $yn in
-        [Yy]* ) echo "Create user @@user ...";
-		        apt-get install sudo;
-		        adduser @@user;
-				adduser @@user sudo;
-				visudo -f /etc/sudoers;
-				break;;
-        [Nn]* ) echo "The start of ioBroker at system start will not work!";;
-        * ) echo "Please answer yes or no.";;
-    esac
+#Create user if first install
+if [ ! -f "/opt/ioBroker/conf/ioBroker.json" ]; then
+    if [ $(cat /etc/passwd | grep "/home" |cut -d: -f1 | grep '^ioBroker$' | wc -l) -eq 0 ]
+    then
+        read -p "Use current user '$USER' for ioBroker? If not, the 'ioBroker' user will be created.! [Y/n]" yn
+        case $yn in
+            [Nn]* ) echo "Create user ioBroker ...";
+                    apt-get install sudo;
+                    adduser ioBroker;
+                    adduser ioBroker sudo;
+                    IO_USER=ioBroker
+                    break;;
+            [Yy]* ) echo "Use user '$USER' for ioBroker.";;
+            * ) echo "Use user $USER for ioBroker.";;
+        esac
+    else
+        IO_USER=ioBroker
+    fi
 fi
 
 #Set rights
 echo "Set permissions..."
 find /opt/ioBroker/ -type d -exec chmod 777 {} \;
 find /opt/ioBroker/ -type f -exec chmod 777 {} \;
-chown -R @@user:@@user /opt/ioBroker/
+chown -R $IO_USER:$IO_USER /opt/ioBroker/
 chmod 777 /etc/init.d/ioBroker.sh
 chown root:root /etc/init.d/ioBroker.sh
 
 # Start the service!
 echo "Start ioBroker..."
+cd /opt/ioBroker
+if [ ! -f "/opt/ioBroker/conf/ioBroker.json" ]; then
+    sh /opt/ioBroker/install.sh
+fi
 node /opt/ioBroker/ioBroker.js start
