@@ -1,45 +1,60 @@
 #!/bin/bash
 #Create empty directories
-if [ ! -d "/opt/ioBroker/tmp" ]; then
-  mkdir /opt/ioBroker/tmp
+if [ ! -d "/opt/iobroker/tmp" ]; then
+  mkdir /opt/iobroker/tmp
 fi
-if [ ! -d "/opt/ioBroker/log" ]; then
-  mkdir /opt/ioBroker/log
+if [ ! -d "/opt/iobroker/log" ]; then
+  mkdir /opt/iobroker/log
 fi
 IO_USER=$USER
 
 #Create user if first install
-if [ ! -f "/opt/ioBroker/conf/ioBroker.json" ]; then
-    if [ $(cat /etc/passwd | grep "/home" |cut -d: -f1 | grep '^ioBroker$' | wc -l) -eq 0 ]
+if [ ! -f "/opt/iobroker/conf/iobroker.json" ]; then
+    if [ $(cat /etc/passwd | grep "/home" |cut -d: -f1 | grep '^iobroker$' | wc -l) -eq 0 ]
     then
-        read -p "Use current user '$USER' for ioBroker? If not, the 'ioBroker' user will be created.! [Y/n]" yn
+        read -p "Use current user '$USER' for iobroker? If not, the 'iobroker' user will be created.! [Y/n]" yn
         case $yn in
-            [Nn]* ) echo "Create user ioBroker ...";
+            [Nn]* ) echo "Create user iobroker ...";
                     apt-get install sudo;
-                    adduser ioBroker;
-                    adduser ioBroker sudo;
-                    IO_USER=ioBroker
+                    useradd iobroker;
+                    adduser iobroker sudo;
+                    IO_USER=iobroker;
                     break;;
-            [Yy]* ) echo "Use user '$USER' for ioBroker.";;
-            * ) echo "Use user $USER for ioBroker.";;
+            [Yy]* ) echo "Use user '$USER' for iobroker.";;
+            * ) echo "Use user $USER for iobroker.";;
         esac
     else
-        IO_USER=ioBroker
+        IO_USER=iobroker
     fi
+else
+    if [ $(cat /etc/passwd | grep "/home" |cut -d: -f1 | grep '^iobroker$' | wc -l) -eq 0 ]
+    then
+        IO_USER=$USER
+    else
+        IO_USER=iobroker
+    fi
+    echo "Use user $IO_USER for install."
+fi
+
+#Modify /etc/couchdb/local.ini. Replace ";bind_address = 127.0.0.1" with "bind_address = 0.0.0.0"
+if grep -Fq ";bind_address = 127.0.0.1" /etc/couchdb/local.ini; then
+    sed -i -e 's/;bind_address = 127\.0\.0\.1/bind_address = 0.0.0.0/g' /etc/couchdb/local.ini
+    /usr/bin/couchdb -d
+    /usr/bin/couchdb -b
 fi
 
 #Set rights
 echo "Set permissions..."
-find /opt/ioBroker/ -type d -exec chmod 777 {} \;
-find /opt/ioBroker/ -type f -exec chmod 777 {} \;
-chown -R $IO_USER:$IO_USER /opt/ioBroker/
-chmod 777 /etc/init.d/ioBroker.sh
-chown root:root /etc/init.d/ioBroker.sh
+find /opt/iobroker/ -type d -exec chmod 777 {} \;
+find /opt/iobroker/ -type f -exec chmod 777 {} \;
+chown -R $IO_USER:$IO_USER /opt/iobroker/
+chmod 777 /etc/init.d/iobroker.sh
+chown root:root /etc/init.d/iobroker.sh
 
 # Start the service!
-echo "Start ioBroker..."
-cd /opt/ioBroker
-if [ ! -f "/opt/ioBroker/conf/ioBroker.json" ]; then
-    sh /opt/ioBroker/install.sh
+echo "Start iobroker..."
+cd /opt/iobroker
+if [ ! -f "/opt/iobroker/conf/iobroker.json" ]; then
+    sh /opt/iobroker/install.sh
 fi
-node /opt/ioBroker/ioBroker.js start
+node /opt/iobroker/iobroker.js start

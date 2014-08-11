@@ -9,7 +9,6 @@ module.exports = function (grunt) {
     var fs          = require('fs');
     var http        = require('http');
     var https       = require('https');
-    var unzip       = require('unzip');
 
     var srcDir      = __dirname + "/";
     var dstDir      = __dirname + "/delivery/";
@@ -120,7 +119,7 @@ module.exports = function (grunt) {
                     {
                         expand:  true,
                         flatten: true,
-                        src:     [gruntDir + 'debian/etc/init.d/ioBroker.sh'],
+                        src:     [gruntDir + 'debian/etc/init.d/iobroker.sh'],
                         dest:    gruntDir + '.debian-pi-control/'
                     }
                 ]
@@ -139,8 +138,8 @@ module.exports = function (grunt) {
                     {
                         expand:  true,
                         flatten: true,
-                        src:     [gruntDir + '.debian-pi-ready/sysroot/opt/ioBroker/package.json'],
-                        dest:    gruntDir + '.debian-pi-ready/sysroot/opt/ioBroker/'
+                        src:     [gruntDir + '.debian-pi-ready/sysroot/opt/iobroker/package.json'],
+                        dest:    gruntDir + '.debian-pi-ready/sysroot/opt/iobroker/'
                     }
                 ]
 
@@ -200,7 +199,7 @@ module.exports = function (grunt) {
                         expand: true,
                         cwd: gruntDir + '../tmp/ioBroker.nodejs-master',
                         src: ['**/*', '!*.bat', '!Gruntfile.js', '!tasks/*'],
-                        dest: gruntDir + '.debian-pi-ready/sysroot/opt/ioBroker/'
+                        dest: gruntDir + '.debian-pi-ready/sysroot/opt/iobroker/'
                     },
                     {
                         expand: true,
@@ -211,7 +210,7 @@ module.exports = function (grunt) {
                     {
                         expand: true,
                         cwd: gruntDir + '.debian-pi-control/',
-                        src: ['ioBroker.sh'],
+                        src: ['iobroker.sh'],
                         dest: gruntDir + '.debian-pi-ready/sysroot/etc/init.d/'
                     }
                 ]
@@ -274,7 +273,7 @@ module.exports = function (grunt) {
                     {
                         expand:  true,
                         flatten: true,
-                        src:     [gruntDir + '.debian-pi-control/ioBroker.sh']
+                        src:     [gruntDir + '.debian-pi-control/iobroker.sh']
                     }
                 ]
             }
@@ -358,8 +357,11 @@ module.exports = function (grunt) {
             iobroker: {
                 src: ['tmp/ioBroker.<%= grunt.task.current.args[0] %>.zip'],
                 dest: 'tmp/'
-            }
-        },
+            },
+            "iobroker-nodejs": {
+                src: ['tmp/ioBroker.nodejs.zip'],
+                dest: 'tmp/'
+            }        },
         exec: {
             npm: {
                 cmd: 'npm install',
@@ -782,7 +784,7 @@ module.exports = function (grunt) {
     grunt.registerTask('windows-msi', function () {
         if (/^win/.test(process.platform)) {
             grunt.task.run([
-                'curl:iobroker:nodejs',
+                'loadIoPackage:nodejs',
                 'copy:windows',
                 'command:makeWindowsMSI'
             ]);
@@ -823,8 +825,8 @@ module.exports = function (grunt) {
     grunt.registerTask('default', [
         'clean:all',
         'curl:io-package:nodejs',
-        'loadIoPackage:nodejs',
         'curl:couchDB',
+        'curl:iobroker:nodejs',
         'unzip:iobroker:nodejs',
         'windows-msi',
         'debian-pi-packet'
