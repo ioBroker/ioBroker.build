@@ -6,12 +6,12 @@ Build installation packages for ioBroker.
 Prerequires:
 - Node JS with NPM
 - Windows to build .exe and debian to build .deb
-- Internet connection, because the ioBroker.nodejs will be downloaded by grunt.
+- Internet connection, because the **ioBroker.nodejs** will be downloaded by grunt.
 
 #Build on windows:
-1. download and extract to some directory: https://github.com/ioBroker/ioBroker.build/archive/master.zip, e.g. d:\ioBroker.build
+1. download and extract to some directory: https://github.com/ioBroker/ioBroker.build/archive/master.zip, e.g. to *d:\ioBroker.build*
 
-2. Start the console (cmd.exe) and go to d:\ioBroker.build:
+2. Start the console (cmd.exe) and go to *d:\ioBroker.build*:
 <pre>
    >d:
    >cd ioBroker.build
