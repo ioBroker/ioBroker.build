@@ -58,3 +58,4 @@ if [ ! -f "/opt/iobroker/conf/iobroker.json" ]; then
     sh /opt/iobroker/install.sh
 fi
 node /opt/iobroker/iobroker.js start
+echo "call http://ip_address:8081/ in browser to get the AdminUI of ioBroker"
