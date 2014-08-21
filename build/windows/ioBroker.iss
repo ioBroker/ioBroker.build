@@ -147,7 +147,7 @@ Filename: "{app}\service_ioBroker.bat"; Parameters: "start"; Flags: runhidden;
 ; Add Firewall Rules
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{app}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{app}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
-Filename: http://localhost:8080/; Description: "Control page"; Flags: postinstall shellexec
+Filename: http://localhost:8081/; Description: "Control page"; Flags: postinstall shellexec
 
 [UninstallRun]
 ; Removes System Service
