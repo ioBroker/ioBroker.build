@@ -1,6 +1,6 @@
 #!/bin/bash
 ### BEGIN INIT INFO
-# Provides:          ioBroker.sh
+# Provides:          iobroker.sh
 # Required-Start:    $network $local_fs $remote_fs
 # Required-Stop::    $network $local_fs $remote_fs
 # Default-Start:     2 3 4 5
@@ -9,9 +9,9 @@
 # Description:       starts ioBroker
 ### END INIT INFO
 (( EUID )) && echo .You need to have root privileges.. && exit 1
-PIDF=/opt/ioBroker/ioBroker.pid
+PIDF=/opt/iobroker/iobroker.pid
 NODECMD=/usr/local/bin/node
-IOBROKERCMD=/opt/ioBroker/ioBroker.js
+IOBROKERCMD=/opt/iobroker/iobroker.js
 RETVAL=0
 IOBROKERUSER=@@user
 
@@ -38,7 +38,7 @@ case "$1" in
       start
   ;;
     *)
-      echo "Usage: ioBroker {start|stop|restart}"
+      echo "Usage: iobroker {start|stop|restart}"
       exit 1
   ;;
 esac

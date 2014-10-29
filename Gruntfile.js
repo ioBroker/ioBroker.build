@@ -29,7 +29,7 @@ module.exports = function (grunt) {
 
     var couchDBlink = "http://apache.lauf-forum.at/couchdb/binary/win/1.6.0/setup-couchdb-1.6.0_R16B02.exe";
     var modules     = [
-        "nodejs"
+        "js-controller"
     ];
 
     // Project configuration.
@@ -55,24 +55,6 @@ module.exports = function (grunt) {
             'debian-pi-control-sysroot': [gruntDir + '.debian-pi-ready/sysroot']
         },
         replace: {
-            core: {
-                options: {
-                    patterns: [
-                        {
-                            match: /settings\.version             = "[\.0-9]*";/g,
-                            replacement: 'settings.version = "' + iocore.version + '";'
-                        }
-                    ]
-                },
-                files: [
-                    {
-                        expand:  true,
-                        flatten: true,
-                        src:     [srcDir + 'main.js'],
-                        dest:    gruntDir + '.build/'
-                    }
-                ]
-            },
             'debian-pi-version': {
                 options: {
                     force: true,
@@ -197,7 +179,7 @@ module.exports = function (grunt) {
                 files: [
                     {
                         expand: true,
-                        cwd: gruntDir + '../tmp/ioBroker.nodejs-master',
+                        cwd: gruntDir + '../tmp/ioBroker.js-controller-master',
                         src: ['**/*', '!*.bat', '!Gruntfile.js', '!tasks/*'],
                         dest: gruntDir + '.debian-pi-ready/sysroot/opt/iobroker/'
                     },
@@ -225,7 +207,7 @@ module.exports = function (grunt) {
                     },
                     {
                         expand: true,
-                        cwd: gruntDir + '../tmp/ioBroker.nodejs-master',
+                        cwd: gruntDir + '../tmp/ioBroker.js-controller-master',
                         src: ['**/*', '!install.sh', '!iobroker', '!Gruntfile.js', '!tasks/*'],
                         dest: gruntDir + '.windows-ready/data/'
                     },
@@ -279,19 +261,6 @@ module.exports = function (grunt) {
             }
         },
         compress: {
-            main: {
-                options: {
-                    archive: dstDir + 'ioBroker.core.' + iocore.version + '.zip'
-                },
-                files: [
-                    {
-                        expand: true,
-                        src: ['**'],
-                        dest: '/',
-                        cwd: gruntDir + '.build/'
-                    }
-                ]
-            },
             adapter: {
                 options: {
                     archive: dstDir + '<%= grunt.task.current.args[1] %>'
@@ -358,8 +327,8 @@ module.exports = function (grunt) {
                 src: ['tmp/ioBroker.<%= grunt.task.current.args[0] %>.zip'],
                 dest: 'tmp/'
             },
-            "iobroker-nodejs": {
-                src: ['tmp/ioBroker.nodejs.zip'],
+            "iobroker-js-controller": {
+                src: ['tmp/ioBroker.js-controller.zip'],
                 dest: 'tmp/'
             }        },
         exec: {
@@ -407,9 +376,9 @@ module.exports = function (grunt) {
             if (!dirs[t].grunt && dirs[t].packet) {
                 console.log (srcDir + 'adapter/' + t + '/io-adapter.json');
                 var adp = grunt.file.readJSON(srcDir + 'adapter/' + t + '/io-adapter.json');
-                console.log(adp.name + adp.version);
-                grunt.task.run(['compress:adapter:' + t + ':ioBroker.adapter.' + adp.ident + '.' + adp.version + '.zip']);
-                grunt.file.copy(srcDir + 'adapter/' + t + '/io-adapter.json', dstDir + 'ioBroker.adapter.' + adp.ident + '.' + adp.version + '.json');
+                console.log(adp.common.name + adp.common.version);
+                grunt.task.run(['compress:adapter:' + t + ':ioBroker.adapter.' + adp.common.name + '.' + adp.common.version + '.zip']);
+                grunt.file.copy(srcDir + 'adapter/' + t + '/io-adapter.json', dstDir + 'ioBroker.adapter.' + adp.common.name + '.' + adp.common.version + '.json');
             } /*else
             if (dirs[t].grunt) {
                 // Start gruntfile
@@ -755,12 +724,12 @@ module.exports = function (grunt) {
             }
         }
 
-        var size = readDirSize('tmp/ioBroker.nodejs-master');
-        iocore = grunt.file.readJSON('tmp/ioBroker.nodejs.io-package.json');
-
+        var size = readDirSize('tmp/ioBroker.js-controller-master');
+        iocore = grunt.file.readJSON('tmp/ioBroker.js-controller-master/io-package.json');
+        console.log(JSON.stringify(iocore));
         grunt.task.run([
             'clean:debian-pi-control',
-            'replace:debian-pi-version:' + (Math.round(size / 1024) + 8) + ':pi:armhf:' + iocore.version, // Settings for raspbian
+            'replace:debian-pi-version:' + (Math.round(size / 1024) + 8) + ':pi:armhf:' + iocore.common.version, // Settings for raspbian
             'lineending',
             'copy:debian-pi',
             'replace:debian-pi-modules',
@@ -777,14 +746,15 @@ module.exports = function (grunt) {
 
 
     grunt.registerTask('loadIoPackage', function () {
-        iocore = grunt.file.readJSON('tmp/ioBroker.' + grunt.task.current.args[0] + '.io-package.json');
-        grunt.task.run(['replace:windowsVersion:' + iocore.version]);
+        iocore = grunt.file.readJSON('tmp/ioBroker.' + grunt.task.current.args[0] + '-master/io-package.json');
+        console.log(JSON.stringify(iocore));
+        grunt.task.run(['replace:windowsVersion:' + iocore.common.version]);
     });
 
     grunt.registerTask('windows-msi', function () {
         if (/^win/.test(process.platform)) {
             grunt.task.run([
-                'loadIoPackage:nodejs',
+                'loadIoPackage:js-controller',
                 'copy:windows',
                 'command:makeWindowsMSI'
             ]);
@@ -799,7 +769,7 @@ module.exports = function (grunt) {
 
 
     grunt.registerTask('createJsonInfo', function () {
-       grunt.file.copy(srcDir + '/io-core.json', dstDir + 'ioBroker.core.' + iocore.version + '.json');
+       grunt.file.copy(srcDir + '/io-core.json', dstDir + 'ioBroker.core.' + iocore.common.version + '.json');
     });
 
     var gruntTasks = [
@@ -824,10 +794,10 @@ module.exports = function (grunt) {
 
     grunt.registerTask('default', [
         'clean:all',
-        'curl:io-package:nodejs',
+        'curl:io-package:js-controller',
         'curl:couchDB',
-        'curl:iobroker:nodejs',
-        'unzip:iobroker:nodejs',
+        'curl:iobroker:js-controller',
+        'unzip:iobroker:js-controller',
         'windows-msi',
         'debian-pi-packet'
 /*        'exec:npm',
