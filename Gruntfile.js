@@ -27,7 +27,7 @@ module.exports = function (grunt) {
         });
     }
 
-    var couchDBlink = "http://apache.lauf-forum.at/couchdb/binary/win/1.6.0/setup-couchdb-1.6.0_R16B02.exe";
+    var couchDBlink = "http://apache.lauf-forum.at/couchdb/binary/win/1.6.1/setup-couchdb-1.6.1_R16B02.exe";
     var modules     = [
         "js-controller"
     ];
