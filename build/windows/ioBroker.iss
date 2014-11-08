@@ -138,6 +138,8 @@ end;
 
 [Run]
 ; postinstall launch
+Filename: "mkdir"; Parameters: "{userappdata}\npm\"
+Filename: "mkdir"; Parameters: "{userappdata}\npm-cache\"
 Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
 Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
 Filename: "{sys}\net.exe"; Parameters: "start redis"
