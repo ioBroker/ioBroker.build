@@ -202,7 +202,7 @@ module.exports = function (grunt) {
                     {
                         expand: true,
                         cwd: gruntDir + 'windows',
-                        src: ['*.js', 'redis-*/**/*', 'couchDB*/**/*', 'nodejs-*/**/*', '*.ico', '*.bat', '*.cmd', '!service_ioBroker.bat'],
+                        src: ['*.js', 'redis-*/**/*', 'couchDB*/**/*', 'nodejs-*/**/*', '*.ico', '*.bat', '!service_ioBroker.bat'],
                         dest: gruntDir + '.windows-ready/'
                     },
                     {
@@ -214,13 +214,7 @@ module.exports = function (grunt) {
                     {
                         expand: true,
                         cwd: gruntDir + 'windows',
-                        src: ['node-modules/**/*'],
-                        dest: gruntDir + '.windows-ready/data/'
-                    },
-                    {
-                        expand: true,
-                        cwd: gruntDir + 'windows',
-                        src: ['service_ioBroker.bat'],
+                        src: ['service_ioBroker.bat', 'node_modules/**/*', '*.cmd'],
                         dest: gruntDir + '.windows-ready/data/'
                     }
                 ]

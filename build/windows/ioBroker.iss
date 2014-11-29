@@ -51,8 +51,10 @@ Source: "redis-v2.4.6\redis-2.4.6-setup-64-bit.exe"; DestDir: "{app}"; DestName:
 Source: "couchDB\couchDBsetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall;
 Source: "install.js"; DestDir: "{app}"; Flags: ignoreversion
 Source: "uninstall.js"; DestDir: "{app}"; Flags: ignoreversion
+;Source: "npm.cmd"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\.windows-ready\data\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+;Source: "node_modules\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 
@@ -128,7 +130,16 @@ begin
 end;
 
 function RedisNeedsInstall():boolean;
+var
+  ResultCode: integer;
 begin
+  if not DirExists(ExpandConstant('{userappdata}\npm')) then begin
+     Exec(ExpandConstant('mkdir'), ExpandConstant('{userappdata}\npm'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+  if not DirExists(ExpandConstant('{userappdata}\npm-cache')) then begin
+     Exec(ExpandConstant('mkdir'), ExpandConstant('{userappdata}\npm-cache'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+
    result := not FileExists(ExpandConstant('{pf}\Redis\redis-service.exe'));
 end;
 function CouchNeedsInstall():boolean;
@@ -138,8 +149,6 @@ end;
 
 [Run]
 ; postinstall launch
-Filename: "mkdir"; Parameters: "{userappdata}\npm\"
-Filename: "mkdir"; Parameters: "{userappdata}\npm-cache\"
 Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
 Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
 Filename: "{sys}\net.exe"; Parameters: "start redis"
