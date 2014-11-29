@@ -773,8 +773,6 @@ module.exports = function (grunt) {
         'grunt-contrib-copy',
         'grunt-contrib-compress',
         'grunt-contrib-commands',
-        'grunt-contrib-jshint',
-        'grunt-jscs',
         'grunt-exec',
         'grunt-zip',
         'grunt-lineending',
