@@ -71,8 +71,8 @@ var
   ResultCode: integer;
 begin
   Result := '';
-  if FileExists(ExpandConstant('{app}\restart_ccu_io.bat')) then begin
-     Exec(ExpandConstant('{app}\restart_ccu_io.bat'), 'stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  if FileExists(ExpandConstant('{app}\service_ioBroker.bat')) then begin
+     Exec(ExpandConstant('{app}\service_ioBroker.bat'), 'stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
 
