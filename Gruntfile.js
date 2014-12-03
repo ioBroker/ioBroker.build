@@ -226,8 +226,21 @@ module.exports = function (grunt) {
                         dest: './delivery/'
                     }
                 ]
+            },
+            adapter:{
+                files:
+                [
+                    {
+                        expand: true,
+                        cwd: srcDir + 'tmp/iobroker.<%= grunt.task.current.args[0] %>-master/',
+                        src: [
+                            '**/*',
+                            '!task.js',
+                            '!Gruntfile.js'],
+                        dest: gruntDir + 'tmp/iobroker.js-controller/adapter/<%= grunt.task.current.args[0] %>'
+                    }
+                ]
             }
-
         },
         lineending: {               // Task
             dist: {                   // Target
@@ -327,378 +340,16 @@ module.exports = function (grunt) {
             }        },
         exec: {
             npm: {
-                cmd: 'npm install',
-                cwd: srcDir + ('<%= grunt.task.current.args[0] %>' || '') + "/"
+                cmd: 'npm install --production',
+                cwd: srcDir + "/tmp/ioBroker.js-controller-master/"
             },
-            npm_adapter: {
-                cmd: 'npm install',
-                cwd: srcDir + '<%= grunt.task.current.args[0] %>' || ''
+             "npm-adapter": {
+                cmd: 'npm install --production',
+                cwd: srcDir + "/tmp/ioBroker.<%= grunt.task.current.args[0] %>-master/"
             }
         }
     });
 
-    grunt.registerTask('buildAllAdapters', function () {
-        var dirs = {};
-        grunt.file.recurse(srcDir + "/adapter/", function (abspath, rootdir, subdir, filename) {
-            if (subdir.indexOf('/') != -1) {
-                if (!dirs[subdir]) {
-                    dirs[subdir] = {};
-                }
-            } else if (filename == 'Gruntfile.js') {
-                if (!dirs[subdir]) {
-                    dirs[subdir] = {};
-                }
-                dirs[subdir].grunt = true;
-            } else if (filename == 'package.json') {
-                if (!dirs[subdir]) {
-                    dirs[subdir] = {};
-                }
-                dirs[subdir].npm = true;
-            } else if (filename == 'io-adapter.json') {
-                if (!dirs[subdir]) {
-                    dirs[subdir] = {};
-                }
-                dirs[subdir].packet = true;
-            }
-        });
-        for (var t in dirs) {
-            if (dirs[t].npm) {
-                console.log('exec:npm_adapter:' + 'adapter/' + t);
-                grunt.task.run(['exec:npm_adapter:' + 'adapter/' + t]);
-            }
-
-            if (!dirs[t].grunt && dirs[t].packet) {
-                console.log (srcDir + 'adapter/' + t + '/io-adapter.json');
-                var adp = grunt.file.readJSON(srcDir + 'adapter/' + t + '/io-adapter.json');
-                console.log(adp.common.name + adp.common.version);
-                grunt.task.run(['compress:adapter:' + t + ':ioBroker.adapter.' + adp.common.name + '.' + adp.common.version + '.zip']);
-                grunt.file.copy(srcDir + 'adapter/' + t + '/io-adapter.json', dstDir + 'ioBroker.adapter.' + adp.common.name + '.' + adp.common.version + '.json');
-            } /*else
-            if (dirs[t].grunt) {
-                // Start gruntfile
-
-            }*/
-        }
-    });
-
-    // --------------------- REPOSITORY START ------------------------------//
-    // Objects for repository
-/*
-     var repObject  = {
-     cores: {},
-     addons: {},
-     adapters: {},
-     installs: {}
-     };
-     var repMain;
-     var repositoryDir = dstDir;
-
-     function translate (text, lang) {
-     lang = lang || 'en';
-     if (!words) {
-     words = {
-     'Adapters':            {'en': 'Adapters',           'de': 'Adapters',             'ru': 'Драйвера'},
-     'Add-ons':             {'en': 'Add-ons',            'de': 'Add-ons',              'ru': 'Модули'},
-     'Core':                {'en': 'Core updates',       'de': 'Updates für Kern',     'ru': 'Обновления ядра'},
-     'Install':             {'en': 'Install packets',    'de': 'Installationspakete',  'ru': 'Файлы для инсталляции'},
-     'ioBroker Repository': {'en': 'ioBroker Downloads', 'de': 'ioBroker Downloads.',  'ru': 'Модули для ioBroker'}
-     };
-     }
-     if (words[text]) {
-     var newText = words[text][lang];
-     if (newText) {
-     return newText;
-     } else
-     if (lang != 'en') {
-     newText = words[text].en;
-     if (newText) {
-     return newText;
-     }
-     }
-
-     }
-     //console.log ("trans: " + text);
-     return text;
-     }
-
-     grunt.registerTask('createRepository', function () {
-     if (grunt.file.exists(repositoryDir + 'io-repository.json')) {
-     repMain = grunt.file.readJSON(repositoryDir + 'io-repository.json');
-     } else {
-     console.log('no ' +  repositoryDir + 'io-repository.json found. Cannot create repository');
-     return;
-     }
-
-     grunt.file.recurse (repositoryDir, function (abspath, rootdir, subdir, filename) {
-     // Unpack
-     if (filename.indexOf('.zip') != -1) {
-     var parts = filename.split('.');
-     parts.splice(parts.length - 1, 1);
-     var tmpDir = parts.join('.');
-     // Check if json description file exists for this packet
-     if (grunt.file.exists(repositoryDir + tmpDir + '.json')) {
-     grunt.task.run(['jsonInfo:' + tmpDir]);
-     } else {
-     grunt.task.run(['unzip:unzipIo:' + filename + ':' + tmpDir]);
-     grunt.task.run(['assembleInfo:' + tmpDir]);
-     }
-     } else if (filename.indexOf('.deb') != -1 || filename.indexOf('.exe') != -1) {
-     grunt.task.run(['packetInfo:' + filename]);
-     }
-     });
-     for (var i = 0; i < repMain.languages.length; i++) {
-     grunt.task.run(['writeRepository:' + repMain.languages[i]]);
-     }
-     });
-
-     grunt.registerTask('packetInfo', function () {
-     // Try to extract from the file name the version and packet type ioBroker-pi.2.0.0.deb or ioBrokerInstaller.2.0.0.exe
-     var parts = grunt.task.current.args[0].split('.');
-     var i = 0;
-     var ver = -1;
-     var version = "";
-     while (i < parts.length) {
-     if (parts[i].length === 0) {
-     i++;
-     continue;
-     }
-     if (parts[i][0] >= '0' && parts[i][0] <= '9') {
-     version += ((version) ? '.' : '') + parts[i];
-     ver++;
-     } else if (ver >= 0) {
-     break;
-     }
-     i++;
-     }
-
-     if (grunt.task.current.args[0].indexOf('.exe') != -1) {
-     if (!repObject.installs.windows) {
-     repObject.installs.windows = {name: 'Windows x86 x64',
-     description: {
-     'en': "Windows installer for ioBroker",
-     'de': "Windows installer für ioBroker",
-     'ru': "Windows installer для ioBroker"
-     },
-     versions: {}
-     };
-     }
-     repObject.installs.windows.versions[version] = {name: 'ioBroker Windows installer',
-     description: {
-     'en': "Windows installer for ioBroker",
-     'de': "Windows installer für ioBroker",
-     'ru': "Windows installer для ioBroker"
-     }
-     };
-     repObject.installs.windows.versions[version].urlDownload = repMain.link + '/' + grunt.task.current.args[0];
-     } else
-     if (grunt.task.current.args[0].indexOf('.deb') != -1) {
-     if (!repObject.installs.pi) {
-     repObject.installs.pi = {name: 'Raspbian on Raspberry PI',
-     description: {
-     'en': "Installation package ioBroker for Raspberry PI",
-     'de': "Installation Paket ioBroker für Raspberry PI",
-     'ru': "ioBroker для Raspberry PI"
-     },
-     versions: {}
-     };
-     }
-     repObject.installs.pi.versions[version] = {name: 'ioBroker for Raspberry PI',
-     description: {
-     'en': "Installation package ioBroker for Raspberry PI",
-     'de': "Installation Paket ioBroker für Raspberry PI",
-     'ru': "ioBroker для Raspberry PI"
-     }
-     };
-     repObject.installs.pi.versions[version].urlDownload = repMain.link + '/' + grunt.task.current.args[0];
-     }
-     });
-
-     grunt.registerTask('assembleInfo', function () {
-     var ioInfo;
-     if (grunt.file.exists(gruntDir + '.rep-work/' + grunt.task.current.args[0] + '/io-addon.json')) {
-     ioInfo = grunt.file.readJSON(gruntDir + '.rep-work/' + grunt.task.current.args[0] + '/io-addon.json');
-     if (!repObject.addons[ioInfo.name]) {
-     repObject.addons[ioInfo.name] = {};
-     }
-     repObject.addons[ioInfo.name][ioInfo.version] = ioInfo;
-     repObject.addons[ioInfo.name][ioInfo.version].urlDownload = repMain.link + '/' + grunt.task.current.args[0] + ".zip";
-     } else
-     if (grunt.file.exists(gruntDir + '.rep-work/' + grunt.task.current.args[0] + '/io-adapter.json')) {
-     ioInfo = grunt.file.readJSON(gruntDir + '.rep-work/' + grunt.task.current.args[0] + '/io-adapter.json');
-     if (!repObject.adapters[ioInfo.name]) {
-     repObject.adapters[ioInfo.name] = {};
-     }
-     repObject.adapters[ioInfo.name][ioInfo.version] = ioInfo;
-     repObject.adapters[ioInfo.name][ioInfo.version].urlDownload = repMain.link + '/' + grunt.task.current.args[0] + ".zip";
-     }else
-     if (grunt.file.exists(gruntDir + '.rep-work/' + grunt.task.current.args[0] + '/io-core.json')) {
-     ioInfo = grunt.file.readJSON(gruntDir + '.rep-work/' + grunt.task.current.args[0] + '/io-core.json');
-     repObject.cores[ioInfo.version] = ioInfo;
-     repObject.cores[ioInfo.version].urlDownload = repMain.link + '/' + grunt.task.current.args[0] + ".zip";
-     }
-     grunt.file.write(repositoryDir + grunt.task.current.args[0] + '.json', JSON.stringify(ioInfo, null, '\t'));
-     grunt.file.delete(gruntDir + '.rep-work/' + grunt.task.current.args[0] + '/');
-     });
-
-     grunt.registerTask('jsonInfo', function () {
-     var ioInfo = grunt.file.readJSON(repositoryDir + grunt.task.current.args[0] + '.json');
-     if (grunt.task.current.args[0].indexOf('.addon.') != -1) {
-     if (!repObject.addons[ioInfo.name]) {
-     repObject.addons[ioInfo.name] = {};
-     }
-     repObject.addons[ioInfo.name][ioInfo.version] = ioInfo;
-     repObject.addons[ioInfo.name][ioInfo.version].urlDownload = repMain.link + '/' + grunt.task.current.args[0] + ".zip";
-     } else
-     if (grunt.task.current.args[0].indexOf('.adapter.') != -1) {
-     if (!repObject.adapters[ioInfo.name]) {
-     repObject.adapters[ioInfo.name] = {};
-     }
-     repObject.adapters[ioInfo.name][ioInfo.version] = ioInfo;
-     repObject.adapters[ioInfo.name][ioInfo.version].urlDownload = repMain.link + '/' + grunt.task.current.args[0] + ".zip";
-     }else
-     if (grunt.task.current.args[0].indexOf('.core.') != -1) {
-     repObject.cores[ioInfo.version] = ioInfo;
-     repObject.cores[ioInfo.version].urlDownload = repMain.link + '/' + grunt.task.current.args[0] + ".zip";
-     }
-     });
-
-     function createDescription (infoObj, lang) {
-     lang = lang || 'en';
-     var desc;
-     if (infoObj.description) {
-     if (infoObj.description[lang]) {
-     desc = infoObj.description[lang];
-     } else if (infoObj.description.en) {
-     desc = infoObj.description.en;
-     } else {
-     desc = infoObj.description;
-     }
-     } else {
-     desc = infoObj.name;
-     }
-
-     return '<p>' + desc + '</p>';
-     }
-
-     grunt.registerTask('writeRepository', function () {
-     var lang = grunt.task.current.args[0] || 'en';
-     if (repMain.htmlFile) {
-     var text = '<html><header><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>' +
-     '<link rel="stylesheet" href="repository.css" type="text/css"/></header>' +
-     '<body><h1>' + (repMain.name[lang] || repMain.name) + '</h1>\n';
-
-     if (repMain.description) {
-     text += createDescription(repMain, lang);
-     }
-
-     // Install packets
-     var headerAdded = false;
-     for (var os_platform in repObject.installs) {
-     if (!headerAdded) {
-     text += '<h2>' + translate('Install', lang) + '</h2>\n';
-     headerAdded = true;
-     }
-
-     text += '<h3>' + (repObject.installs[os_platform].name || os_platform) + '</h3>\n';
-     for (var ver in repObject.installs[os_platform].versions) {
-     text += '<tr><td><a href="' + repObject.installs[os_platform].versions[ver].urlDownload + '">' + ver + '</a></td></td>\n';
-     }
-     }
-
-     // Update cores
-     headerAdded = false;
-     for (var verr in repObject.cores) {
-     if (!headerAdded) {
-     text += '<h2>' + translate('Core', lang) + '</h2>\n';
-     text += createDescription(repObject.cores[verr], lang);
-     text += "<table>\n";
-     headerAdded = true;
-     }
-     text += '<tr><td><a href="' + repObject.cores[verr].urlDownload + '">' + verr + '</a></td></td>\n';
-     }
-     if (headerAdded) {
-     text += "</table>\n";
-     }
-
-     // Addons
-     headerAdded = false;
-     for (var addon in repObject.addons) {
-     if (!headerAdded) {
-     text += '<h2>' + translate('Add-ons', lang) + '</h2>\n';
-     headerAdded = true;
-     }
-
-     text += '<h3>' + addon + '</h3>\n';
-     var headerAdded2 = false;
-     for (verr in repObject.addons[addon]) {
-     if (!headerAdded2) {
-     text += createDescription(repObject.addons[addon][verr], lang);
-     headerAdded2 = true;
-     text += "<table>\n";
-     }
-
-     text += '<tr><td><a href="' + repObject.addons[addon][verr].urlDownload + '">' + verr + '</a></td></td>\n';
-     }
-     if (headerAdded2) {
-     text += "</table>\n";
-     }
-     }
-
-     // Adapters
-     headerAdded = false;
-     for (var adapter in repObject.adapters) {
-     if (!headerAdded) {
-     text += '<h2>' + translate('Adapters', lang) + '</h2>';
-     headerAdded = true;
-     }
-
-     text += '<h3>' + adapter + '</h3>';
-     var headerAdded3 = false;
-     for (verr in repObject.adapters[adapter]) {
-     if (!headerAdded3) {
-     text += createDescription(repObject.adapters[adapter][verr], lang);
-     headerAdded3 = true;
-     text += "<table>";
-     }
-
-     text += '<tr><td><a href="' + repObject.adapters[adapter][verr].urlDownload + '">' + verr + '</a></td></td>\n';
-     }
-     if (headerAdded3) {
-     text += "</table>";
-     }
-     }
-     text += '</body></html>';
-     grunt.file.write (repositoryDir + repMain.htmlFile + '-' + lang + '.html', text);
-     }
-     if (!repMain.jsonCreated) {
-     repMain.repository = repObject;
-     grunt.file.write (repositoryDir + (repMain.jsonFile || 'repository') + '.json', JSON.stringify(repMain, null, '\t'));
-     repMain.jsonCreated = true;
-     }
-     });
-     grunt.registerTask('rep', ['createRepository']);
-     grunt.registerTask('localRep', ['copy:localRepository', 'createRepository']);
-
-     // ----------------------------- REPOSITORY END --------------------------- //
-
-
-
-
-
-     grunt.registerTask('makeEmptyDirs', function () {
-     grunt.file.mkdir(gruntDir + '.build/log');
-     grunt.file.mkdir(gruntDir + '.build/datastore');
-     grunt.file.mkdir(gruntDir + '.build/tmp');
-     });
-
-
-     var writeVersions = {
-     name: "writeVersions",
-     list: [
-     'replace:core'
-     ]
-     };
-*/
     grunt.registerTask('debian-pi-packet', function () {
         // Calculate size of directory
         var path = require('path');
@@ -738,6 +389,21 @@ module.exports = function (grunt) {
         }
     });
 
+    grunt.registerTask('buildAllAdapters', function () {
+        // Calculate size of directory
+        var e = grunt.file.readJSON('tmp/ioBroker.js-controller-master/conf/sources-dist.json');
+        var tasks = [];
+        tasks.push('exec:npm');
+        for (var adapter in e) {
+            if (adapter == "js-controller") continue;
+            if (!e[adapter].url) continue;
+            tasks.push('curl:iobroker:' + adapter);
+            tasks.push('unzip:iobroker:' + adapter);
+            tasks.push('exec:npm-adapter:' + adapter);
+            tasks.push('copy:adapter:' + adapter);
+        }
+        grunt.task.run(tasks);
+    });
 
     grunt.registerTask('loadIoPackage', function () {
         iocore = grunt.file.readJSON('tmp/ioBroker.' + grunt.task.current.args[0] + '-master/io-package.json');
@@ -750,6 +416,7 @@ module.exports = function (grunt) {
             grunt.task.run([
                 'loadIoPackage:js-controller',
                 'copy:windows',
+                'exec:npm-windows',// Remove it if not the FULL MODE
                 'command:makeWindowsMSI'
             ]);
             console.log('========= Please wait a little (ca 1 min). The msi file will be created in ioBroker/delivery directory after the grunt is finished.');
@@ -760,7 +427,6 @@ module.exports = function (grunt) {
             console.log('Cannot create windows setup, while host is not windows');
         }
     });
-
 
     grunt.registerTask('createJsonInfo', function () {
        grunt.file.copy(srcDir + '/io-core.json', dstDir + 'ioBroker.core.' + iocore.common.version + '.json');
@@ -787,19 +453,11 @@ module.exports = function (grunt) {
     grunt.registerTask('default', [
         'clean:all',
         'curl:io-package:js-controller',
-        'curl:couchDB',
+        //'curl:couchDB',
         'curl:iobroker:js-controller',
         'unzip:iobroker:js-controller',
+        'buildAllAdapters',
         'windows-msi',
         'debian-pi-packet'
-/*        'exec:npm',
-        'replace:core',
-        'makeEmptyDirs',
-        'copy:static',
-        'compress:main',
-        'createJsonInfo',
-        'buildAllAdapters',
-        'debian-pi-packet',
-        'windows-msi'*/
     ]);
 };
