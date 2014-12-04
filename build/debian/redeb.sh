@@ -4,14 +4,14 @@
 # Protect against misspelling a var and rm -rf /
 set -u
 set -e
-
+chmod 777 * -R
 rm -f ioBroker-@@version.deb
 
 rm -rf dest
 mkdir -p dest
 rm -f *.deb
 #unpack data
-mkdir sysroot
+mkdir -p sysroot
 cd sysroot
 echo "Unpack DATA"
 tar -xf ../data.tar.gz

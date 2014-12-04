@@ -165,7 +165,7 @@ Filename: http://localhost:8081/; Description: "Control page"; Flags: postinstal
 Filename: "{app}\node.exe"; Parameters: "uninstall.js"; Flags: runhidden;
 Filename: "{sys}\net"; Parameters: "stop redis"; Flags: runhidden; 
 Filename: "{pf}\Redis\unins000.exe"
-Filename: "{pf32}\Apache Software Foundation\CouchDB\unins000.exe"
+;Filename: "{pf32}\Apache Software Foundation\CouchDB\unins000.exe"
 
 ; Remove Firewall Rules
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node In"" program=""{app}\node.exe"""; Flags: runhidden;

@@ -394,7 +394,6 @@ module.exports = function (grunt) {
 
         var size = readDirSize('tmp/ioBroker.js-controller-master');
         iocore = grunt.file.readJSON('tmp/ioBroker.js-controller-master/io-package.json');
-        console.log(JSON.stringify(iocore));
         grunt.task.run([
             'clean:debian-pi-control',
             'replace:debian-pi-version:' + (Math.round(size / 1024) + 8) + ':pi:armhf:' + iocore.common.version, // Settings for raspbian
