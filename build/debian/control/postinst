@@ -9,24 +9,24 @@ fi
 IO_USER=$USER
 
 #Create user if first install
-if [ ! -f "/opt/iobroker/conf/iobroker.json" ]; then
-    if [ $(cat /etc/passwd | grep "/home" |cut -d: -f1 | grep '^iobroker$' | wc -l) -eq 0 ]
-    then
-        read -p "Use current user '$USER' for iobroker? If not, the 'iobroker' user will be created.! [Y/n]" yn
-        case $yn in
-            [Nn]* ) echo "Create user iobroker ...";
-                    apt-get install sudo;
-                    useradd iobroker;
-                    adduser iobroker sudo;
-                    IO_USER=iobroker;
-                    break;;
-            [Yy]* ) echo "Use user '$USER' for iobroker.";;
-            * ) echo "Use user $USER for iobroker.";;
-        esac
-    else
-        IO_USER=iobroker
-    fi
-else
+#if [ ! -f "/opt/iobroker/conf/iobroker.json" ]; then
+#    if [ $(cat /etc/passwd | grep "/home" |cut -d: -f1 | grep '^iobroker$' | wc -l) -eq 0 ]
+#    then
+#        read -p "Use current user '$USER' for iobroker? If not, the 'iobroker' user will be created.! [Y/n]" yn
+#        case $yn in
+#            [Nn]* ) echo "Create user iobroker ...";
+#                    apt-get install sudo;
+#                    useradd iobroker;
+#                    adduser iobroker sudo;
+#                    IO_USER=iobroker;
+#                    break;;
+#            [Yy]* ) echo "Use user '$USER' for iobroker.";;
+#            * ) echo "Use user $USER for iobroker.";;
+#        esac
+#    else
+#        IO_USER=iobroker
+#    fi
+#else
     if [ $(cat /etc/passwd | grep "/home" |cut -d: -f1 | grep '^iobroker$' | wc -l) -eq 0 ]
     then
         IO_USER=$USER
@@ -34,14 +34,14 @@ else
         IO_USER=iobroker
     fi
     echo "Use user $IO_USER for install."
-fi
+#fi
 
 #Modify /etc/couchdb/local.ini. Replace ";bind_address = 127.0.0.1" with "bind_address = 0.0.0.0"
-if grep -Fq ";bind_address = 127.0.0.1" /etc/couchdb/local.ini; then
-    sed -i -e 's/;bind_address = 127\.0\.0\.1/bind_address = 0.0.0.0/g' /etc/couchdb/local.ini
-    /usr/bin/couchdb -d
-    /usr/bin/couchdb -b
-fi
+#if grep -Fq ";bind_address = 127.0.0.1" /etc/couchdb/local.ini; then
+#    sed -i -e 's/;bind_address = 127\.0\.0\.1/bind_address = 0.0.0.0/g' /etc/couchdb/local.ini
+#    /usr/bin/couchdb -d
+#    /usr/bin/couchdb -b
+#fi
 
 #Set rights
 echo "Set permissions..."
@@ -57,5 +57,5 @@ cd /opt/iobroker
 if [ ! -f "/opt/iobroker/conf/iobroker.json" ]; then
     sh /opt/iobroker/install.sh
 fi
-node /opt/iobroker/iobroker.js start
+node iobroker.js start
 echo "call http://ip_address:8081/ in browser to get the AdminUI of ioBroker"
