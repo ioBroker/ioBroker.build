@@ -365,10 +365,15 @@ module.exports = function (grunt) {
                 cmd: 'npm install --production',
                 cwd: srcDir + "/tmp/ioBroker.js-controller-master/"
             },
-             "npm-adapter": {
+            "npm-adapter": {
                 force: true,
                 cmd: 'npm install --production',
                 cwd: srcDir + "/tmp/ioBroker.<%= grunt.task.current.args[0] %>-master/"
+            },
+            "npm-npm-adapter": {
+                force: true,
+                cmd: 'npm install iobroker.<%= grunt.task.current.args[0] %> --production',
+                cwd: srcDir + "/tmp/ioBroker.js-controller-master/"
             }
         }
     });
@@ -418,25 +423,29 @@ module.exports = function (grunt) {
         tasks.push('exec:npm');
         for (var adapter in e) {
             if (adapter == "js-controller") continue;
+            if (adapter == "example") continue;
             if (adapter == "artnet") continue;
             if (adapter == "cul") continue;
             if (adapter == "highcharts") continue;
             if (adapter == "zwave") continue;
-            if (!e[adapter].url) continue;
-            if (!grunt.file.exists(srcDir + 'tmp/ioBroker.' + adapter + '.zip'))
-                tasks.push('curl:iobroker:' + adapter);
-            if (!grunt.file.isDir(srcDir + 'tmp/ioBroker.' + adapter + '-master'))
-                tasks.push('unzip:iobroker:' + adapter);
-            if (!grunt.file.isDir(srcDir + 'tmp/ioBroker.' + adapter + '-master/node_modules'))
-                tasks.push('exec:npm-adapter:' + adapter);
-            tasks.push('copy:adapter:' + adapter);
+
+            if (!e[adapter].url)  {
+                tasks.push('exec:npm-npm-adapter:' + adapter);
+            } else {
+                if (!grunt.file.exists(srcDir + 'tmp/ioBroker.' + adapter + '.zip'))
+                    tasks.push('curl:iobroker:' + adapter);
+                if (!grunt.file.isDir(srcDir + 'tmp/ioBroker.' + adapter + '-master'))
+                    tasks.push('unzip:iobroker:' + adapter);
+                if (!grunt.file.isDir(srcDir + 'tmp/ioBroker.' + adapter + '-master/node_modules'))
+                    tasks.push('exec:npm-adapter:' + adapter);
+                tasks.push('copy:adapter:' + adapter);
+            }
         }
         grunt.task.run(tasks);
     });
 
     grunt.registerTask('loadIoPackage', function () {
         iocore = grunt.file.readJSON('tmp/ioBroker.' + grunt.task.current.args[0] + '-master/io-package.json');
-        console.log(JSON.stringify(iocore));
         grunt.task.run(['replace:windowsVersion:' + iocore.common.version]);
     });
 
