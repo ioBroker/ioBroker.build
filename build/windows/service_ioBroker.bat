@@ -24,13 +24,13 @@ if '%errorlevel%' NEQ '0' (
     pushd "%CD%"
     CD /D "%~dp0"
 :--------------------------------------
-if '%1' == 'start' C:\Windows\system32\net.exe start ioBroker
-if '%1' == 'stop' C:\Windows\system32\net.exe stop ioBroker
+if '%1' == 'start' %WINDIR%\system32\net.exe start ioBroker
+if '%1' == 'stop' %WINDIR%\system32\net.exe stop ioBroker
 if '%1' == '' (
-	C:\Windows\system32\net.exe stop ioBroker
-	C:\Windows\system32\net.exe start ioBroker
+	%WINDIR%\system32\net.exe stop ioBroker
+	%WINDIR%\system32\net.exe start ioBroker
 )
 if '%1' == 'restart' (
-	C:\Windows\system32\net.exe stop ioBroker
-	C:\Windows\system32\net.exe start ioBroker
+	%WINDIR%\system32\net.exe stop ioBroker
+	%WINDIR%\system32\net.exe start ioBroker
 )
