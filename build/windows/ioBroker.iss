@@ -152,7 +152,8 @@ end;
 Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
 ;Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
 Filename: "{sys}\net.exe"; Parameters: "start redis"
-Filename: "{app}\install.bat"; Flags: runhidden;
+Filename: "{app}\install.bat"
+; Flags: runhidden;
 Filename: "{app}\node.exe"; Parameters: "install.js"; Flags: runhidden;
 Filename: "{app}\service_ioBroker.bat"; Parameters: "start"; Flags: runhidden;
 ; Add Firewall Rules
