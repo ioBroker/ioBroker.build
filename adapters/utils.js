@@ -12,12 +12,10 @@ function getControllerDir () {
         controllerDir = controllerDir.join('/');
         if (fs.existsSync(controllerDir + '/iobroker.js-controller')) {
             controllerDir += '/iobroker.js-controller';
-        } else if (fs.existsSync(controllerDir + '/controller.js')) {
-
-        } else {
+        } else if (!fs.existsSync(controllerDir + '/controller.js')) {
             console.log('Cannot find js-controller');
             process.exit(10);
-        }
+        } 
     } else {
         console.log('Cannot find js-controller');
         process.exit(10);
