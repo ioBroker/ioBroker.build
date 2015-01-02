@@ -1,5 +1,7 @@
 var controllerDir;
-function getControllerDir () {
+
+// Get js-controller directory to load libs
+function getControllerDir() {
     var fs = require('fs');
     // Find the js-controller location
     var controllerDir = __dirname.replace(/\\/g, '/');
@@ -23,6 +25,7 @@ function getControllerDir () {
     return controllerDir;
 }
 
+// Read controller configuration file
 function getConfig () {
     return JSON.parse(fs.readFileSync(controllerDir + '/conf/iobroker.json'));
 }
