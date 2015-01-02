@@ -26,7 +26,7 @@ function getControllerDir() {
 }
 
 // Read controller configuration file
-function getConfig () {
+function getConfig() {
     return JSON.parse(fs.readFileSync(controllerDir + '/conf/iobroker.json'));
 }
 controllerDir = getControllerDir();
