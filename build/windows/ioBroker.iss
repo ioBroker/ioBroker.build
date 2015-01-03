@@ -42,12 +42,11 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "german";  MessagesFile: "compiler:Languages\German.isl"
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 
-
 [Files]
 Source: "nodejs-v0.10.33\node.exe"; DestDir: "{app}"; Flags: ignoreversion; Check: not Is64BitInstallMode
 Source: "nodejs-v0.10.33\nodex64.exe"; DestDir: "{app}"; DestName: "node.exe"; Flags: ignoreversion; Check: Is64BitInstallMode
-Source: "redis-v2.4.6\redis-2.4.6-setup-32-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: not Is64BitInstallMode
-Source: "redis-v2.4.6\redis-2.4.6-setup-64-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: Is64BitInstallMode
+;Source: "redis-v2.4.6\redis-2.4.6-setup-32-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: not Is64BitInstallMode
+;Source: "redis-v2.4.6\redis-2.4.6-setup-64-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: Is64BitInstallMode
 ;Source: "couchDB\couchDBsetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall;
 Source: "install.js"; DestDir: "{app}"; Flags: ignoreversion
 Source: "uninstall.js"; DestDir: "{app}"; Flags: ignoreversion
@@ -56,7 +55,6 @@ Source: "{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\.windows-ready\data\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ;Source: "node_modules\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
-
 
 [Icons]
 Name: "{group}\{#MyAppName} Settings"; Filename: "http://localhost:8080"; IconFilename: "{app}\{#MyAppIcon}"
@@ -149,9 +147,9 @@ end;
 
 [Run]
 ; postinstall launch
-Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
+;Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
 ;Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
-Filename: "{sys}\net.exe"; Parameters: "start redis"
+;Filename: "{sys}\net.exe"; Parameters: "start redis"
 Filename: "{app}\install.bat"
 ; Flags: runhidden;
 Filename: "{app}\node.exe"; Parameters: "install.js"; Flags: runhidden;
@@ -164,8 +162,8 @@ Filename: http://localhost:8081/; Description: "Control page"; Flags: postinstal
 [UninstallRun]
 ; Removes System Service
 Filename: "{app}\node.exe"; Parameters: "uninstall.js"; Flags: runhidden;
-Filename: "{sys}\net"; Parameters: "stop redis"; Flags: runhidden; 
-Filename: "{pf}\Redis\unins000.exe"
+;Filename: "{sys}\net"; Parameters: "stop redis"; Flags: runhidden; 
+;Filename: "{pf}\Redis\unins000.exe"
 ;Filename: "{pf32}\Apache Software Foundation\CouchDB\unins000.exe"
 
 ; Remove Firewall Rules
@@ -179,6 +177,8 @@ Filename: "{sys}\del"; Parameters: """{app}\node_modules\*""";
 Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\node_modules""";
 Filename: "{sys}\del"; Parameters: """{app}\conf\*""";
 Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\conf""";
+Filename: "{sys}\del"; Parameters: """{app}\data\*""";
+Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\data""";
 Filename: "{sys}\del"; Parameters: """{app}\log\*""";
 Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\log""";
 Filename: "{sys}\del"; Parameters: """{app}\adapter\*""";

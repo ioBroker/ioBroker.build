@@ -54,8 +54,13 @@ chown root:root /etc/init.d/iobroker.sh
 # Start the service!
 echo "Start iobroker..."
 cd /opt/iobroker
+mkdir data
+mkdir data/files
+mkdir data/history
+chmod 777 * -R
 if [ ! -f "/opt/iobroker/conf/iobroker.json" ]; then
     sh /opt/iobroker/install.sh
 fi
+chmod 777 * -R
 node iobroker.js start
 echo "call http://ip_address:8081/ in browser to get the AdminUI of ioBroker"
