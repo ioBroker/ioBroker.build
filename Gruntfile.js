@@ -28,6 +28,8 @@ module.exports = function (grunt) {
     }
 
     //var couchDBlink = "http://apache.lauf-forum.at/couchdb/binary/win/1.6.1/setup-couchdb-1.6.1_R16B02.exe";
+    var nodejslink86 = "http://nodejs.org/dist/v0.10.35/node-v0.10.35-x86.msi";
+    var nodejslink64 = "http://nodejs.org/dist/v0.10.35/x64/node-v0.10.35-x64.msi";
 
     // Project configuration.
     grunt.initConfig({
@@ -44,7 +46,15 @@ module.exports = function (grunt) {
             'couchDB': {
                 src: couchDBlink,
                 dest: 'build/windows/couchDB/couchDBsetup.exe'
-            }*/
+            }*/,
+            'nodex86': {
+                src: nodejslink86,
+                dest: 'build/windows/nodejs/node.msi'
+            },
+            'nodex64': {
+                src: nodejslink64,
+                dest: 'build/windows/nodejs/node-x64.msi'
+            }
         },
         clean: {
             all: [gruntDir + '.build', gruntDir + '.debian-pi-control', gruntDir + '.debian-pi-ready', gruntDir + '.windows-ready', "tmp"],
@@ -178,7 +188,6 @@ module.exports = function (grunt) {
                         src: [
                             'cert/*',
                             'doc/*',
-                            'node_modules/**/*',
                             'scripts/*',
                             'www/control/**/*',
                             'www/lib/**/*',
@@ -224,7 +233,11 @@ module.exports = function (grunt) {
                     {
                         expand: true,
                         cwd: gruntDir + 'windows',
-                        src: ['*.js', 'redis-*/**/*', 'couchDB*/**/*', 'nodejs-*/**/*', '*.ico', '*.bat', '!*.sh', '!service_ioBroker.bat', '!_service_ioBroker.bat'],
+                        src: ['*.js',
+                            //'redis-*/**/*',
+                            //'couchDB*/**/*',
+                            'nodejs/**/*',
+                            '*.ico', '*.bat', '!*.sh', '!service_ioBroker.bat', '!_service_ioBroker.bat'],
                         dest: gruntDir + '.windows-ready/'
                     },
                     {
@@ -236,7 +249,7 @@ module.exports = function (grunt) {
                     {
                         expand: true,
                         cwd: gruntDir + 'windows',
-                        src: ['service_ioBroker.bat', '_service_ioBroker.bat', 'node_modules/**/*', '*.cmd'],
+                        src: ['service_ioBroker.bat', '_service_ioBroker.bat', '*.cmd'],
                         dest: gruntDir + '.windows-ready/data/'
                     }
                 ]
@@ -486,6 +499,8 @@ module.exports = function (grunt) {
     grunt.registerTask('default', [
         'clean:all',
         'curl:io-package:js-controller',
+        'curl:nodex86',
+        'curl:nodex64',
         //'curl:couchDB',
         'curl:iobroker:js-controller',
         'unzip:iobroker:js-controller',
@@ -495,6 +510,8 @@ module.exports = function (grunt) {
     grunt.registerTask('full', [
         'clean:all',
         'curl:io-package:js-controller',
+        'curl:nodex86',
+        'curl:nodex64',
         //'curl:couchDB',
         'curl:iobroker:js-controller',
         'unzip:iobroker:js-controller',

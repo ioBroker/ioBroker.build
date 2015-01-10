@@ -43,8 +43,8 @@ Name: "german";  MessagesFile: "compiler:Languages\German.isl"
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 
 [Files]
-Source: "nodejs-v0.10.33\node.exe"; DestDir: "{app}"; Flags: ignoreversion; Check: not Is64BitInstallMode
-Source: "nodejs-v0.10.33\nodex64.exe"; DestDir: "{app}"; DestName: "node.exe"; Flags: ignoreversion; Check: Is64BitInstallMode
+Source: "nodejs\node.msi"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall; Check: not Is64BitInstallMode
+Source: "nodejs\node-x64.msi"; DestDir: "{app}"; DestName: "node.msi"; Flags: ignoreversion deleteafterinstall; Check: Is64BitInstallMode
 ;Source: "redis-v2.4.6\redis-2.4.6-setup-32-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: not Is64BitInstallMode
 ;Source: "redis-v2.4.6\redis-2.4.6-setup-64-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: Is64BitInstallMode
 ;Source: "couchDB\couchDBsetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall;
@@ -131,56 +131,51 @@ function RedisNeedsInstall():boolean;
 var
   ResultCode: integer;
 begin
-  if not DirExists(ExpandConstant('{userappdata}\npm')) then begin
-     Exec(ExpandConstant('mkdir'), ExpandConstant('{userappdata}\npm'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  end;
-  if not DirExists(ExpandConstant('{userappdata}\npm-cache')) then begin
-     Exec(ExpandConstant('mkdir'), ExpandConstant('{userappdata}\npm-cache'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  end;
-
    result := not FileExists(ExpandConstant('{pf}\Redis\redis-service.exe'));
 end;
 function CouchNeedsInstall():boolean;
 begin
    result := not FileExists(ExpandConstant('{pf32}\Apache Software Foundation\CouchDB\Install.exe'));
 end;
+function NodeJsNeedsInstall():boolean;
+var
+  ResultCode: integer;
+begin
+  result := not DirExists(ExpandConstant('{userappdata}\npm'));
+  if not DirExists(ExpandConstant('{userappdata}\npm')) then begin
+     Exec(ExpandConstant('mkdir'), ExpandConstant('{userappdata}\npm'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+  if not DirExists(ExpandConstant('{userappdata}\npm-cache')) then begin
+     Exec(ExpandConstant('mkdir'), ExpandConstant('{userappdata}\npm-cache'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end;
+end;
 
 [Run]
 ; postinstall launch
+Filename: "msiexec.exe"; Parameters: "/i ""{app}\node.msi"" /passive"; Check: NodeJsNeedsInstall
 ;Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
 ;Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
 ;Filename: "{sys}\net.exe"; Parameters: "start redis"
 Filename: "{app}\install.bat"
 ; Flags: runhidden;
-Filename: "{app}\node.exe"; Parameters: "install.js"; Flags: runhidden;
+Filename: "{pf}\nodejs\node.exe"; Parameters: """{app}\install.js"""; Flags: runhidden;
 Filename: "{app}\service_ioBroker.bat"; Parameters: "start"; Flags: runhidden;
 ; Add Firewall Rules
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{app}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{app}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{pf}\nodejs\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{pf}\nodejs\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
 Filename: http://localhost:8081/; Description: "Control page"; Flags: postinstall shellexec
 
 [UninstallRun]
 ; Removes System Service
-Filename: "{app}\node.exe"; Parameters: "uninstall.js"; Flags: runhidden;
-;Filename: "{sys}\net"; Parameters: "stop redis"; Flags: runhidden; 
+Filename: "{pf}\nodejs\node.exe"; Parameters: """{app}\uninstall.js"""; Flags: runhidden;
+Filename: "{sys}\del"; Parameters: "/Q /S ""{app}\daemon""";
+Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\daemon""";
+Filename: "{sys}\del"; Parameters: "/Q /S ""{app}""";
+Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}""";
+;Filename: "{sys}\net"; Parameters: "stop redis"; Flags: runhidden;
 ;Filename: "{pf}\Redis\unins000.exe"
 ;Filename: "{pf32}\Apache Software Foundation\CouchDB\unins000.exe"
-
 ; Remove Firewall Rules
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node In"" program=""{app}\node.exe"""; Flags: runhidden;
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node Out"" program=""{app}\node.exe"""; Flags: runhidden;
-
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node In"" program=""{pf}\nodejs\node.exe"""; Flags: runhidden;
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node Out"" program=""{pf}\nodejs\node.exe"""; Flags: runhidden;
 ; Remove all leftovers
-Filename: "{sys}\del"; Parameters: """{app}\daemon\*""";
-Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\daemon""";
-Filename: "{sys}\del"; Parameters: """{app}\node_modules\*""";
-Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\node_modules""";
-Filename: "{sys}\del"; Parameters: """{app}\conf\*""";
-Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\conf""";
-Filename: "{sys}\del"; Parameters: """{app}\data\*""";
-Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\data""";
-Filename: "{sys}\del"; Parameters: """{app}\log\*""";
-Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\log""";
-Filename: "{sys}\del"; Parameters: """{app}\adapter\*""";
-Filename: "{sys}\rmdir"; Parameters: "-r ""{app}\adapter""";
-Filename: "{sys}\rmdir"; Parameters: "-r ""{app}""";
