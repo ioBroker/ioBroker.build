@@ -414,7 +414,7 @@ module.exports = function (grunt) {
         iocore = grunt.file.readJSON('tmp/ioBroker.js-controller-master/io-package.json');
         grunt.task.run([
             'clean:debian-pi-control',
-            'replace:debian-pi-version:' + (Math.round(size / 1024) + 8) + ':pi:armhf:' + iocore.common.version, // Settings for raspbian
+            'replace:debian-pi-version:' + (Math.round(size / 1024) + 8) + ':pi:all:' + iocore.common.version, // Settings for debian
             'lineending',
             'copy:debian-pi',
             'replace:debian-pi-modules',

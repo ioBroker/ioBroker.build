@@ -50,6 +50,7 @@ find /opt/iobroker/ -type f -exec chmod 777 {} \;
 chown -R $IO_USER:$IO_USER /opt/iobroker/
 chmod 777 /etc/init.d/iobroker.sh
 chown root:root /etc/init.d/iobroker.sh
+update-rc.d /etc/init.d/iobroker.sh defaults
 
 # Start the service!
 echo "Start iobroker..."

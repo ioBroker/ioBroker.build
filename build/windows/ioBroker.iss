@@ -57,7 +57,7 @@ Source: "..\.windows-ready\data\*"; DestDir: "{app}"; Flags: ignoreversion recur
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
-Name: "{group}\{#MyAppName} Settings"; Filename: "http://localhost:8080"; IconFilename: "{app}\{#MyAppIcon}"
+Name: "{group}\{#MyAppName} Settings"; Filename: "http://localhost:8081"; IconFilename: "{app}\{#MyAppIcon}"
 Name: "{group}\{#MyAppName} Uninstall"; Filename: "{uninstallexe}"
 Name: "{group}\Start {#MyAppName} Service"; Filename: "{app}\service_ioBroker.bat"; Parameters: "start"
 Name: "{group}\Stop {#MyAppName} Service"; Filename: "{app}\service_ioBroker.bat"; Parameters: "stop"
@@ -141,7 +141,9 @@ function NodeJsNeedsInstall():boolean;
 var
   ResultCode: integer;
 begin
-  result := not DirExists(ExpandConstant('{userappdata}\npm'));
+  //result := not DirExists(ExpandConstant('{userappdata}\npm'));
+  result := not FileExists(ExpandConstant('{pf}\nodejs\node.exe'));
+  
   if not DirExists(ExpandConstant('{userappdata}\npm')) then begin
      Exec(ExpandConstant('mkdir'), ExpandConstant('{userappdata}\npm'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
