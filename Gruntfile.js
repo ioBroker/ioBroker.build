@@ -16,6 +16,9 @@ module.exports = function (grunt) {
     var pkg         = grunt.file.readJSON('package.json');
     var iocore      = {};//grunt.file.readJSON('io-package.json');
     var words       = null;
+    srcDir = srcDir.replace(/\\/g, '/');
+    dstDir = dstDir.replace(/\\/g, '/');
+    gruntDir = gruntDir.replace(/\\/g, '/');
 
     var download = function(url, dest, cb) {
         var file = fs.createWriteStream(dest);
@@ -172,8 +175,8 @@ module.exports = function (grunt) {
                     {
                         expand:  true,
                         flatten: true,
-                        src:     [srcDir + 'tmp/ioBroker.js-controller-master/install.bat', srcDir + 'tmp/ioBroker.js-controller-master/install.sh'],
-                        dest:    srcDir + 'tmp/ioBroker.js-controller-master/'
+                        src:     [srcDir + 'tmp/data/node_modules/iobroker.js-controller/install.bat', srcDir + 'tmp/data/node_modules/iobroker.js-controller/install.sh'],
+                        dest:    srcDir + 'tmp/data/node_modules/iobroker.js-controller/'
                     }
                 ]
 
@@ -206,14 +209,18 @@ module.exports = function (grunt) {
                     }
                 ]
             },
-            'debian-pi': {
+            'debian-pi-broker': {
                 files: [
                     {
                         expand: true,
-                        cwd: gruntDir + '../tmp/ioBroker.js-controller-master',
+                        cwd: gruntDir + '../tmp/data/',
                         src: ['**/*', '!*.bat', '!Gruntfile.js', '!tasks/*'],
                         dest: gruntDir + '.debian-pi-ready/sysroot/opt/iobroker/'
-                    },
+                    }
+                ]
+            },
+            'debian-pi': {
+                files: [
                     {
                         expand: true,
                         cwd: gruntDir + '.debian-pi-control/control',
@@ -228,6 +235,16 @@ module.exports = function (grunt) {
                     }
                 ]
             },
+            'windows-broker':{
+                files: [
+                    {
+                        expand: true,
+                        cwd: gruntDir + '../tmp/data/',
+                       src: ['**/*', '!node_modules/iobroker.js-controller/node_modules/**/*', '!iobroker-data', '!iobroker-data/**/*', '!install.sh', '!iobroker', '!Gruntfile.js', '!tasks/*'],
+                        dest: gruntDir + '.windows-ready/data/'
+                    }
+                ]
+            },
             windows: {
                 files: [
                     {
@@ -237,14 +254,8 @@ module.exports = function (grunt) {
                             //'redis-*/**/*',
                             //'couchDB*/**/*',
                             'nodejs/**/*',
-                            '*.ico', '*.bat', '!*.sh', '!service_ioBroker.bat', '!_service_ioBroker.bat'],
+                            '*.ico', '*.bat', '*.json', '!*.sh', '!service_ioBroker.bat', '!_service_ioBroker.bat'],
                         dest: gruntDir + '.windows-ready/'
-                    },
-                    {
-                        expand: true,
-                        cwd: gruntDir + '../tmp/ioBroker.js-controller-master',
-                        src: ['**/*', '!install.sh', '!iobroker', '!Gruntfile.js', '!tasks/*'],
-                        dest: gruntDir + '.windows-ready/data/'
                     },
                     {
                         expand: true,
@@ -267,12 +278,12 @@ module.exports = function (grunt) {
                 [
                     {
                         expand: true,
-                        cwd: srcDir + 'tmp/iobroker.<%= grunt.task.current.args[0] %>-master/',
+                        cwd: srcDir + 'tmp/node_modules/iobroker.<%= grunt.task.current.args[0] %>/',
                         src: [
                             '**/*',
                             '!task.js',
                             '!Gruntfile.js'],
-                        dest: srcDir + 'tmp/iobroker.js-controller-master/adapter/<%= grunt.task.current.args[0] %>'
+                        dest: srcDir + 'tmp/node_modules/iobroker.js-controller/adapter/<%= grunt.task.current.args[0] %>'
                     }
                 ]
             }
@@ -376,17 +387,17 @@ module.exports = function (grunt) {
         exec: {
             npm: {
                 cmd: 'npm install --production',
-                cwd: srcDir + "/tmp/ioBroker.js-controller-master/"
+                cwd: srcDir + "tmp/data/iobroker.js-controller"
             },
             "npm-adapter": {
                 force: true,
                 cmd: 'npm install --production',
-                cwd: srcDir + "/tmp/ioBroker.<%= grunt.task.current.args[0] %>-master/"
+                cwd: srcDir + "tmp/data/ioBroker.<%= grunt.task.current.args[0] %>-master"
             },
             "npm-npm-adapter": {
                 force: true,
-                cmd: 'npm install iobroker.<%= grunt.task.current.args[0] %> --production',
-                cwd: srcDir + "/tmp/ioBroker.js-controller-master/"
+                cmd: 'npm install --prefix tmp/data iobroker.<%= grunt.task.current.args[0] %> --production',
+                cwd: srcDir
             }
         }
     });
@@ -410,8 +421,8 @@ module.exports = function (grunt) {
             }
         }
 
-        var size = readDirSize('tmp/ioBroker.js-controller-master');
-        iocore = grunt.file.readJSON('tmp/ioBroker.js-controller-master/io-package.json');
+        var size = 100000000;//readDirSize('tmp/ioBroker.js-controller-master');
+        iocore = grunt.file.readJSON('tmp/data/node_modules/iobroker.js-controller/io-package.json');
         grunt.task.run([
             'clean:debian-pi-control',
             'replace:debian-pi-version:' + (Math.round(size / 1024) + 8) + ':pi:all:' + iocore.common.version, // Settings for debian
@@ -458,7 +469,7 @@ module.exports = function (grunt) {
     });
 
     grunt.registerTask('loadIoPackage', function () {
-        iocore = grunt.file.readJSON('tmp/ioBroker.' + grunt.task.current.args[0] + '-master/io-package.json');
+        iocore = grunt.file.readJSON('tmp/data/node_modules/iobroker.' + grunt.task.current.args[0] + '/io-package.json');
         grunt.task.run(['replace:windowsVersion:' + iocore.common.version]);
     });
 
@@ -476,6 +487,11 @@ module.exports = function (grunt) {
         } else {
             console.log('Cannot create windows setup, while host is not windows');
         }
+    });
+
+    grunt.registerTask('create-data-dir', function () {
+        if (!fs.existsSync(srcDir + 'tmp')) fs.mkdirSync(srcDir + 'tmp');
+        if (!fs.existsSync(srcDir + 'tmp/data')) fs.mkdirSync(srcDir + 'tmp/data');
     });
 
     var gruntTasks = [
@@ -497,14 +513,16 @@ module.exports = function (grunt) {
     }
 
     grunt.registerTask('default', [
-        'clean:all',
-        'curl:io-package:js-controller',
-        'curl:nodex86',
-        'curl:nodex64',
-        //'curl:couchDB',
-        'curl:iobroker:js-controller',
-        'unzip:iobroker:js-controller',
-        'windows-msi',
+        //'clean:all',
+        ////'curl:io-package:js-controller',
+        //'curl:nodex86',
+        //'curl:nodex64',
+        //'create-data-dir',
+        ////'curl:couchDB',
+        ////'curl:iobroker:js-controller',
+        //'exec:npm-npm-adapter:js-controller',
+        ////'unzip:iobroker:js-controller',
+        //'windows-msi',
         'debian-pi-packet'
     ]);
     grunt.registerTask('full', [

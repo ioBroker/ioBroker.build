@@ -48,8 +48,9 @@ Source: "nodejs\node-x64.msi"; DestDir: "{app}"; DestName: "node.msi"; Flags: ig
 ;Source: "redis-v2.4.6\redis-2.4.6-setup-32-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: not Is64BitInstallMode
 ;Source: "redis-v2.4.6\redis-2.4.6-setup-64-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: Is64BitInstallMode
 ;Source: "couchDB\couchDBsetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall;
-Source: "install.js"; DestDir: "{app}"; Flags: ignoreversion
-Source: "uninstall.js"; DestDir: "{app}"; Flags: ignoreversion
+Source: "*.js"; DestDir: "{app}"; Flags: ignoreversion
+Source: "install.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "package.json"; DestDir: "{app}"; Flags: ignoreversion
 ;Source: "npm.cmd"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\.windows-ready\data\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -172,8 +173,8 @@ Filename: http://localhost:8081/; Description: "Control page"; Flags: postinstal
 Filename: "{pf}\nodejs\node.exe"; Parameters: """{app}\uninstall.js"""; Flags: runhidden;
 Filename: "{sys}\del"; Parameters: "/Q /S ""{app}\daemon""";
 Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\daemon""";
-Filename: "{sys}\del"; Parameters: "/Q /S ""{app}""";
-Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}""";
+Filename: "{sys}\del"; Parameters: "/Q /S ""{app}\node_modules""";
+Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\node_modules""";
 ;Filename: "{sys}\net"; Parameters: "stop redis"; Flags: runhidden;
 ;Filename: "{pf}\Redis\unins000.exe"
 ;Filename: "{pf32}\Apache Software Foundation\CouchDB\unins000.exe"
