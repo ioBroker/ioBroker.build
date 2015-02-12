@@ -48,21 +48,21 @@ Source: "nodejs\node-x64.msi"; DestDir: "{app}"; DestName: "node.msi"; Flags: ig
 ;Source: "redis-v2.4.6\redis-2.4.6-setup-32-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: not Is64BitInstallMode
 ;Source: "redis-v2.4.6\redis-2.4.6-setup-64-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: Is64BitInstallMode
 ;Source: "couchDB\couchDBsetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall;
-Source: "*.js"; DestDir: "{app}"; Flags: ignoreversion
-Source: "install.bat"; DestDir: "{app}"; Flags: ignoreversion
-Source: "package.json"; DestDir: "{app}"; Flags: ignoreversion
+;Source: "*.js"; DestDir: "{app}"; Flags: ignoreversion
+;Source: "install.bat"; DestDir: "{app}"; Flags: ignoreversion
+;Source: "package.json"; DestDir: "{app}"; Flags: ignoreversion
 ;Source: "npm.cmd"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\.windows-ready\data\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+;Source: "..\.windows-ready\data\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ;Source: "node_modules\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
 Name: "{group}\{#MyAppName} Settings"; Filename: "http://localhost:8081"; IconFilename: "{app}\{#MyAppIcon}"
 Name: "{group}\{#MyAppName} Uninstall"; Filename: "{uninstallexe}"
-Name: "{group}\Start {#MyAppName} Service"; Filename: "{app}\service_ioBroker.bat"; Parameters: "start"
-Name: "{group}\Stop {#MyAppName} Service"; Filename: "{app}\service_ioBroker.bat"; Parameters: "stop"
-Name: "{group}\Restart {#MyAppName} Service"; Filename: "{app}\service_ioBroker.bat"; Parameters: "restart"
+Name: "{group}\Start {#MyAppName} Service"; Filename: "{app}\serviceIoBroker.bat"; Parameters: "start"
+Name: "{group}\Stop {#MyAppName} Service"; Filename: "{app}\serviceIoBroker.bat"; Parameters: "stop"
+Name: "{group}\Restart {#MyAppName} Service"; Filename: "{app}\serviceIoBroker.bat"; Parameters: "restart"
 
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -70,8 +70,8 @@ var
   ResultCode: integer;
 begin
   Result := '';
-  if FileExists(ExpandConstant('{app}\service_ioBroker.bat')) then begin
-     Exec(ExpandConstant('{app}\service_ioBroker.bat'), 'stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  if FileExists(ExpandConstant('{app}\serviceIoBroker.bat')) then begin
+     Exec(ExpandConstant('{app}\serviceIoBroker.bat'), 'stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
 end;
 
@@ -156,13 +156,13 @@ end;
 [Run]
 ; postinstall launch
 Filename: "msiexec.exe"; Parameters: "/i ""{app}\node.msi"" /passive"; Check: NodeJsNeedsInstall
+Filename: "{pf}\nodejs\npm.cmd"; Parameters: "install iobroker --prefix ""{app}""";
 ;Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
 ;Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
 ;Filename: "{sys}\net.exe"; Parameters: "start redis"
-Filename: "{app}\install.bat"
-; Flags: runhidden;
-Filename: "{pf}\nodejs\node.exe"; Parameters: """{app}\install.js"""; Flags: runhidden;
-Filename: "{app}\service_ioBroker.bat"; Parameters: "start"; Flags: runhidden;
+;Filename: "{app}\install.bat"
+;Filename: "{pf}\nodejs\node.exe"; Parameters: """{app}\install.js"""; Flags: runhidden;
+;Filename: "{app}\serviceIoBroker.bat"; Parameters: "start"; Flags: runhidden;
 ; Add Firewall Rules
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{pf}\nodejs\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{pf}\nodejs\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;

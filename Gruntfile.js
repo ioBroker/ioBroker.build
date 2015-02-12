@@ -20,6 +20,8 @@ module.exports = function (grunt) {
     dstDir = dstDir.replace(/\\/g, '/');
     gruntDir = gruntDir.replace(/\\/g, '/');
 
+    var version     = "0.5.0";
+
     var download = function(url, dest, cb) {
         var file = fs.createWriteStream(dest);
         var request = http.get(url, function(response) {
@@ -469,14 +471,15 @@ module.exports = function (grunt) {
     });
 
     grunt.registerTask('loadIoPackage', function () {
-        iocore = grunt.file.readJSON('tmp/data/node_modules/iobroker.' + grunt.task.current.args[0] + '/io-package.json');
-        grunt.task.run(['replace:windowsVersion:' + iocore.common.version]);
+        //iocore = grunt.file.readJSON('tmp/data/node_modules/iobroker.' + grunt.task.current.args[0] + '/io-package.json');
+        grunt.task.run(['replace:windowsVersion:' + version || iocore.common.version]);
     });
 
     grunt.registerTask('windows-msi', function () {
         if (/^win/.test(process.platform)) {
+            grunt.task.run(['replace:windowsVersion:' + version || iocore.common.version]);
             grunt.task.run([
-                'loadIoPackage:js-controller',
+//                'loadIoPackage:js-controller',
                 'copy:windows',
                 'command:makeWindowsMSI'
             ]);
@@ -513,7 +516,7 @@ module.exports = function (grunt) {
     }
 
     grunt.registerTask('default', [
-        //'clean:all',
+        'clean:all',
         ////'curl:io-package:js-controller',
         //'curl:nodex86',
         //'curl:nodex64',
@@ -522,8 +525,8 @@ module.exports = function (grunt) {
         ////'curl:iobroker:js-controller',
         //'exec:npm-npm-adapter:js-controller',
         ////'unzip:iobroker:js-controller',
-        //'windows-msi',
-        'debian-pi-packet'
+        'windows-msi'
+        //'debian-pi-packet'
     ]);
     grunt.registerTask('full', [
         'clean:all',
