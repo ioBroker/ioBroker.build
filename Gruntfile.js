@@ -5,22 +5,28 @@
 /*jslint node: true */
 "use strict";
 
+// README First:
+// it must be done as admin:
+// - npm install
+// - grunt full (may with error, ignore it)
+// - grunt default
+// after that go to ioBroker.build/build/.windows-ready and start createSetup.bat
+
 module.exports = function (grunt) {
     var fs          = require('fs');
     var http        = require('http');
     var https       = require('https');
 
-    var srcDir      = __dirname + "/";
-    var dstDir      = __dirname + "/delivery/";
-    var gruntDir    = __dirname + "/build/";
+    var srcDir      = __dirname + '/';
+    var dstDir      = __dirname + '/delivery/';
+    var gruntDir    = __dirname + '/build/';
     var pkg         = grunt.file.readJSON('package.json');
     var iocore      = {};//grunt.file.readJSON('io-package.json');
-    var words       = null;
-    srcDir = srcDir.replace(/\\/g, '/');
-    dstDir = dstDir.replace(/\\/g, '/');
-    gruntDir = gruntDir.replace(/\\/g, '/');
+    srcDir          = srcDir.replace(/\\/g, '/');
+    dstDir          = dstDir.replace(/\\/g, '/');
+    gruntDir        = gruntDir.replace(/\\/g, '/');
 
-    var version     = "0.5.0";
+    var version     = require(__dirname + '/package.json').version;
 
     var download = function(url, dest, cb) {
         var file = fs.createWriteStream(dest);
@@ -33,8 +39,8 @@ module.exports = function (grunt) {
     }
 
     //var couchDBlink = "http://apache.lauf-forum.at/couchdb/binary/win/1.6.1/setup-couchdb-1.6.1_R16B02.exe";
-    var nodejslink86 = "http://nodejs.org/dist/v0.10.35/node-v0.10.35-x86.msi";
-    var nodejslink64 = "http://nodejs.org/dist/v0.10.35/x64/node-v0.10.35-x64.msi";
+    var nodejslink86 = 'http://nodejs.org/dist/v4.3.1/node-v4.3.1-x86.msi';
+    var nodejslink64 = 'http://nodejs.org/dist/v4.3.1/node-v4.3.1-x64.msi';
 
     // Project configuration.
     grunt.initConfig({
@@ -472,12 +478,12 @@ module.exports = function (grunt) {
 
     grunt.registerTask('loadIoPackage', function () {
         //iocore = grunt.file.readJSON('tmp/data/node_modules/iobroker.' + grunt.task.current.args[0] + '/io-package.json');
-        grunt.task.run(['replace:windowsVersion:' + version || iocore.common.version]);
+        grunt.task.run(['replace:windowsVersion:' + version]);
     });
 
     grunt.registerTask('windows-msi', function () {
         if (/^win/.test(process.platform)) {
-            grunt.task.run(['replace:windowsVersion:' + version || iocore.common.version]);
+            grunt.task.run(['replace:windowsVersion:' + version]);
             grunt.task.run([
 //                'loadIoPackage:js-controller',
                 'copy:windows',

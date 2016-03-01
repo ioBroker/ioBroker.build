@@ -2,12 +2,12 @@ var Service = require('node-windows').Service;
 
 // Create a new service object
 var svc = new Service({
-  name: 'ioBroker',
-  description: 'ioBroker Controller service.',
-  script: require('path').join(__dirname, 'controller.js'),
+  name:         'ioBroker',
+  description:  'ioBroker service.',
+  script:       require('path').join(__dirname, 'controller.js'),
   env: {
-    name: "NODE_ENV",
-    value: "production"
+    name:       'NODE_ENV',
+    value:      'production'
   }
 });
 

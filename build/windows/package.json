@@ -4,11 +4,11 @@
     "node": ">=0.8"
   },
   "dependencies": {
-    "node-windows": "~0.1.5",
+    "node-windows": "https://github.com/arthurblake/node-windows/tarball/f1fd60e93e2469663b99a9cf3a64086ecedfe1e4",
 	"iobroker.js-controller": "*",
     "iobroker.admin": "*"
   },
-  "homepage": "http://www.iobroker.com",
+  "homepage": "http://iobroker.net",
   "description": "...domesticate the Internet of Things",
   "keywords": [
     "ioBroker",
@@ -36,12 +36,12 @@
   ],
   "author": {
     "name": "bluefox",
-    "email": "bluefox@ccu.io"
+    "email": "dogafox@gmail.com"
   },
   "contributors": [
     {
       "name": "bluefox",
-      "email": "bluefox@ccu.io"
+      "email": "dogafox@gmail.com"
     }
   ],
   "repository": {
