@@ -147,8 +147,13 @@ var
 begin
   //result := not DirExists(ExpandConstant('{userappdata}\npm'));
   result := not FileExists(ExpandConstant('{pf64}\nodejs\node.exe'));
-  if not result then begin
+
+  if result then begin
     result := not FileExists(ExpandConstant('{pf32}\nodejs\node.exe'));
+  end;
+
+  if result then begin
+    result := not FileExists(ExpandConstant('{pf}\nodejs\node.exe'));
   end;
 
   if not DirExists(ExpandConstant('{userappdata}\npm')) then begin
@@ -162,13 +167,19 @@ end;
 function NodeJsPath(Param: String):String;
 begin
   result := '';
-  //result := not DirExists(ExpandConstant('{userappdata}\npm'));
-  if DirExists(ExpandConstant('{pf64}\nodejs')) then begin
-    result := ExpandConstant('{pf64}\nodejs');
+
+  if DirExists(ExpandConstant('{pf}\nodejs')) then begin
+    result := ExpandConstant('{pf}\nodejs');
   end;
+
   if DirExists(ExpandConstant('{pf32}\nodejs')) then begin
     result := ExpandConstant('{pf32}\nodejs');
   end;
+
+  if DirExists(ExpandConstant('{pf64}\nodejs')) then begin
+    result := ExpandConstant('{pf64}\nodejs');
+  end;
+
 end;
 
 [Run]
