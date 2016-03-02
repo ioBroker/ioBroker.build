@@ -195,7 +195,7 @@ Filename: "{code:NodeJsPath}\npm.cmd"; Parameters: "install iobroker --prefix ""
 ; Add Firewall Rules
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{code:NodeJsPath}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{code:NodeJsPath}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
-Filename: http://localhost:8081/; Description: "Control page"; Flags: postinstall shellexec
+Filename: http://localhost:8081/; Description: "Admin page"; Flags: postinstall shellexec
 
 [UninstallRun]
 ; Removes System Service
