@@ -132,24 +132,27 @@ begin
 end;
 
 function RedisNeedsInstall():boolean;
-var
-  ResultCode: integer;
 begin
    result := not FileExists(ExpandConstant('{pf}\Redis\redis-service.exe'));
 end;
+
 function CouchNeedsInstall():boolean;
 begin
    result := not FileExists(ExpandConstant('{pf32}\Apache Software Foundation\CouchDB\Install.exe'));
 end;
+
 function NodeJsNeedsInstall():boolean;
 var
   ResultCode: integer;
 begin
-  //result := not DirExists(ExpandConstant('{userappdata}\npm'));
-  result := not FileExists(ExpandConstant('{pf64}\nodejs\node.exe'));
 
-  if result then begin
-    result := not FileExists(ExpandConstant('{pf32}\nodejs\node.exe'));
+  result := true;
+  if IsWin64 then begin
+      result := not FileExists(ExpandConstant('{pf64}\nodejs\node.exe'));
+
+      if result then begin
+        result := not FileExists(ExpandConstant('{pf32}\nodejs\node.exe'));
+      end;
   end;
 
   if result then begin
@@ -172,14 +175,28 @@ begin
     result := ExpandConstant('{pf}\nodejs');
   end;
 
-  if DirExists(ExpandConstant('{pf32}\nodejs')) then begin
-    result := ExpandConstant('{pf32}\nodejs');
+  if IsWin64 then begin
+      if DirExists(ExpandConstant('{pf32}\nodejs')) then begin
+        result := ExpandConstant('{pf32}\nodejs');
+      end;
+
+      if DirExists(ExpandConstant('{pf64}\nodejs')) then begin
+        result := ExpandConstant('{pf64}\nodejs');
+      end;
+  end;
+end;
+
+function GetAdminPageText(Param: String):String;
+begin
+  result := 'Open settings page';
+
+  if ActiveLanguage() = 'german' then begin
+    result := 'Einstellungen aufmachen';
   end;
 
-  if DirExists(ExpandConstant('{pf64}\nodejs')) then begin
-    result := ExpandConstant('{pf64}\nodejs');
+  if ActiveLanguage() = 'russian' then begin
+      result := 'Открыть настройки';
   end;
-
 end;
 
 [Run]
@@ -195,7 +212,7 @@ Filename: "{code:NodeJsPath}\npm.cmd"; Parameters: "install iobroker --prefix ""
 ; Add Firewall Rules
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{code:NodeJsPath}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{code:NodeJsPath}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
-Filename: http://localhost:8081/; Description: "Admin page"; Flags: postinstall shellexec
+Filename: http://localhost:8081/; Description: "{cm:AdminPage,None}"; Flags: postinstall shellexec
 
 [UninstallRun]
 ; Removes System Service
