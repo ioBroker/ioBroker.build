@@ -130,7 +130,7 @@ cd node_modules\%NAME%.vis
 cmd /C npm install --production
 cd ..\..
 
-if not exist "%NAME%.cmd" echo node node_modules\%NAME%.js-controller\%NAME%.js
+if not exist "%NAME%.cmd" echo node node_modules\%NAME%.js-controller\%NAME%.js %%1 %%2 %%3 %%4 %%5 > %NAME%.cmd
 
 IF "%2"=="clean" goto DELETEGRUNT
 
