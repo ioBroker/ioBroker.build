@@ -30,7 +30,10 @@ if exist "%NAME%.javascript\.git" 		rmdir /S /Q "%NAME%.javascript\.git"
 if exist "%NAME%.simple-api\.git" 		rmdir /S /Q "%NAME%.simple-api\.git"
 if exist "%NAME%.vis\.git" 				rmdir /S /Q "%NAME%.vis\.git"
 
-
+echo "copy js-controller-io-package.json to js-controller"
+copy ..\js-controller-io-package.json %NAME%.js-controller\io-package.json
+copy ..\js-controller-sources-dist.json %NAME%.js-controller\conf\sources-dist.json
+if exist "%NAME%.js-controller\conf\cert.crt" del %NAME%.js-controller\conf\cert.*
 cd %NAME%.js-controller
 if not exist "node_modules\grunt" 					cmd /C npm install grunt@0.4.5
 if not exist "node_modules\grunt-replace" 			cmd /C npm install grunt-replace@0.9.3
@@ -41,6 +44,8 @@ echo Todo certificates, repository, icon, readme link
 cmd /C grunt rename
 cd ..\..
 
+echo "copy admin-license.js to admin adapter"
+copy admin-license.js node_modules\%NAME%.admin\www\js\license.js
 cd node_modules\%NAME%.admin
 if not exist "node_modules\grunt" 					cmd /C npm install grunt@0.4.5
 if not exist "node_modules\grunt-replace" 			cmd /C npm install grunt-replace@0.9.3
@@ -91,6 +96,8 @@ cmd /C grunt rename
 echo Todo icon, readme link, rename script
 cd ..\..
 
+echo "copy visAbout.js to vis"
+copy visAbout.js node_modules\%NAME%.vis\www\js\visAbout.js
 
 cd node_modules\%NAME%.vis
 if not exist "node_modules\grunt" 					cmd /C npm install grunt@0.4.5
@@ -182,7 +189,7 @@ if exist "node_modules\%NAME%.simple-api\node_modules\grunt-http" 				rmdir /S /
 goto END
 
 :NOPARAM
-echo please give new name like: create myproject
+echo please give new name like: createOem myproject
 
 :END
 
