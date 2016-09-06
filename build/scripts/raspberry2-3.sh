@@ -43,14 +43,17 @@ sudo rm -r bin/node bin/node-waf include/node lib/node lib/pkgconfig/nodejs.pc s
  
  
 # Install NodeJS from Nodesource.com. 
-curl -sL https://deb.nodesource.com/setup_4.x | sudo -E bash - 
-sudo apt-get install -y nodejs
-
-# Or download directly from nodejs.org
-#cd /tmp
-#wget https://nodejs.org/dist/v4.5.0/node-v4.5.0-linux-arm64.tar.xz
-#cd /usr/local
-#sudo tar --strip-components=1 -xvf /tmp/node-v4.5.0-linux-arm64.tar.xz
+if [[ $(/bin/uname -a) != *pine64* ]] 
+then
+   curl -sL https://deb.nodesource.com/setup_4.x | sudo -E bash - 
+   sudo apt-get install -y nodejs
+else
+   # Or download directly from nodejs.org
+   cd /tmp
+   wget https://nodejs.org/dist/v4.5.0/node-v4.5.0-linux-arm64.tar.xz
+   cd /usr/local
+   sudo tar --strip-components=1 -xvf /tmp/node-v4.5.0-linux-arm64.tar.xz
+fi
 
  
 # Install build essentials. 
