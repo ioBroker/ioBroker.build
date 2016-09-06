@@ -60,7 +60,7 @@ sudo apt-get install -y build-essential
 sudo mkdir /opt/iobroker 
 sudo chmod 777 /opt/iobroker
 cd /opt/iobroker
-sudo npm install iobroker --unsafe-perm 
+sudo npm install iobroker --unsafe-perm --production
 sudo chmod 777 * -R
  
 # Install of ALL drivers. 
