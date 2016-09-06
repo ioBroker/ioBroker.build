@@ -3,8 +3,8 @@
 #use_static_ip="yes"
  
 # System update. 
-apt-get update 
-apt-get -y upgrade 
+sudo apt-get update 
+sudo apt-get -y upgrade 
  
  
  
@@ -36,15 +36,15 @@ if [[ $use_static_ip == "yes" ]]
 fi 
  
 # Deinstall preinstalled node version, because ioBroker requires specific version 
-apt-get remove -y node 
-apt-get remove -y nodejs 
-apt-get autoremove -y 
-rm -r bin/node bin/node-waf include/node lib/node lib/pkgconfig/nodejs.pc share/man/man1/node.1 
+sudo apt-get remove -y node 
+sudo apt-get remove -y nodejs 
+sudo apt-get autoremove -y 
+sudo rm -r bin/node bin/node-waf include/node lib/node lib/pkgconfig/nodejs.pc share/man/man1/node.1 
  
  
 # Install NodeJS from Nodesource.com. 
 curl -sL https://deb.nodesource.com/setup_4.x | sudo -E bash - 
-apt-get install -y nodejs
+sudo apt-get install -y nodejs
 
 # Or download directly from nodejs.org
 #cd /tmp
@@ -54,13 +54,14 @@ apt-get install -y nodejs
 
  
 # Install build essentials. 
-apt-get install -y build-essential 
+sudo apt-get install -y build-essential 
  
 #Installation of iobroker. 
-mkdir /opt/iobroker 
-chmod 777 /opt/iobroker
+sudo mkdir /opt/iobroker 
+sudo chmod 777 /opt/iobroker
 cd /opt/iobroker
-npm install iobroker  
+sudo npm install iobroker --unsafe-perm 
+sudo chmod 777 * -R
  
 # Install of ALL drivers. 
 # allAdapter=`cat /opt/iobroker/node_modules/iobroker.js-controller/conf/sources-dist.json | grep ": {"` 
@@ -91,7 +92,6 @@ npm install iobroker
 ./iobroker install flot
 ./iobroker install sql
 ./iobroker install cloud
-
 ./iobroker install mobile
  
 # setup autostart of ioBroker. 
