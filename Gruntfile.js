@@ -39,8 +39,8 @@ module.exports = function (grunt) {
     }
 
     //var couchDBlink = "http://apache.lauf-forum.at/couchdb/binary/win/1.6.1/setup-couchdb-1.6.1_R16B02.exe";
-    var nodejslink86 = 'http://nodejs.org/dist/v4.3.1/node-v4.3.1-x86.msi';
-    var nodejslink64 = 'http://nodejs.org/dist/v4.3.1/node-v4.3.1-x64.msi';
+    var nodejslink86 = 'https://nodejs.org/dist/v4.5.0/node-v4.5.0-x86.msi';
+    var nodejslink64 = 'https://nodejs.org/dist/v4.5.0/node-v4.5.0-x64.msi';
 
     // Project configuration.
     grunt.initConfig({
