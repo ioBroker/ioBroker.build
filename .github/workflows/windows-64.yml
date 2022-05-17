@@ -1,0 +1,26 @@
+name: Vangers Windows 64bit Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version: 14
+    - name: install grunt
+      run: |
+        npm install grunt-cli -g
+        npm install
+        grunt
+      working-directory: clunk/build
+    - name: create setup
+      run: |
+        createSetup.bat
+      working-directory: build/.windows-ready
+    - uses: actions/upload-artifact@v1
+      with:
+        name: Windows-installer
+        path: delivery
