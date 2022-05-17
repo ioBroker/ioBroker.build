@@ -19,6 +19,7 @@ jobs:
       run: |
         createSetup.bat
       working-directory: build/.windows-ready
+      shell: cmd
     - uses: actions/upload-artifact@v1
       with:
         name: Windows-installer
