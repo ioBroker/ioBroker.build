@@ -17,8 +17,8 @@ jobs:
         grunt
     - name: create setup
       run: |
-        createSetup.bat
-      working-directory: build/.windows-ready
+        .windows-ready/createSetup.bat
+      working-directory: build
       shell: cmd
     - uses: actions/upload-artifact@v1
       with:
