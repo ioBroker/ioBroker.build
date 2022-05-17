@@ -203,15 +203,16 @@ end;
 ; postinstall launch
 Filename: "msiexec.exe"; Parameters: "/i ""{app}\node.msi"" /passive"; Check: NodeJsNeedsInstall
 Filename: "{code:NodeJsPath}\npm.cmd"; Parameters: "install iobroker --prefix ""{app}""";
+Filename: "{code:NodeJsPath}\npm.cmd"; Parameters: "install --production"; WorkingDir: "{app}";
+Filename: "{app}\serviceIoBroker.bat"; Parameters: "start"; WorkingDir: "{app}";
 ;Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
 ;Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
 ;Filename: "{sys}\net.exe"; Parameters: "start redis"
 ;Filename: "{app}\install.bat"
 ;Filename: "{code:NodeJsPath}\node.exe"; Parameters: """{app}\install.js"""; Flags: runhidden;
-;Filename: "{app}\serviceIoBroker.bat"; Parameters: "start"; Flags: runhidden;
 ; Add Firewall Rules
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{code:NodeJsPath}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{code:NodeJsPath}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
+; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{code:NodeJsPath}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
+; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{code:NodeJsPath}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
 Filename: http://localhost:8081/; Description: "{cm:AdminPage,None}"; Flags: postinstall shellexec
 
 [UninstallRun]
@@ -225,6 +226,6 @@ Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\node_modules""";
 ;Filename: "{pf}\Redis\unins000.exe"
 ;Filename: "{pf32}\Apache Software Foundation\CouchDB\unins000.exe"
 ; Remove Firewall Rules
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node In"" program=""{code:NodeJsPath}\node.exe"""; Flags: runhidden;
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node Out"" program=""{code:NodeJsPath}\node.exe"""; Flags: runhidden;
+; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node In"" program=""{code:NodeJsPath}\node.exe"""; Flags: runhidden;
+; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node Out"" program=""{code:NodeJsPath}\node.exe"""; Flags: runhidden;
 ; Remove all leftovers
