@@ -524,8 +524,8 @@ module.exports = function (grunt) {
     grunt.registerTask('default', [
         'clean:all',
         ////'curl:io-package:js-controller',
-        //'curl:nodex86',
-        //'curl:nodex64',
+        'curl:nodex86',
+        'curl:nodex64',
         //'create-data-dir',
         ////'curl:couchDB',
         ////'curl:iobroker:js-controller',
