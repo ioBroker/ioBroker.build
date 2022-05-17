@@ -15,7 +15,6 @@ jobs:
         npm install grunt-cli -g
         npm install
         grunt
-      working-directory: clunk/build
     - name: create setup
       run: |
         createSetup.bat
