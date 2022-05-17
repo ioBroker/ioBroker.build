@@ -16,6 +16,7 @@ jobs:
         npm install
         grunt
       shell: cmd
+      working-directory: .
     - name: create setup
       run: |
         createSetup.bat
