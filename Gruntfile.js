@@ -42,6 +42,8 @@ module.exports = function (grunt) {
     var nodejslink86 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x86.msi';
     var nodejslink64 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x64.msi';
 
+    grunt.file.preserveBOM = true;
+
     // Project configuration.
     grunt.initConfig({
         pkg: pkg,
@@ -360,7 +362,7 @@ module.exports = function (grunt) {
         command: {
             makeWindowsMSI: {
                 // type : 'bat',
-                cmd: '"' + gruntDir + 'windows\\InnoSetup5\\ISCC.exe" "' + gruntDir + '.windows-ready\\ioBroker.iss" > "' + gruntDir + '.windows-ready\\setup.log"'
+                cmd: '"' + gruntDir + 'windows\\InnoSetup6\\ISCC.exe" "' + gruntDir + '.windows-ready\\ioBroker.iss" > "' + gruntDir + '.windows-ready\\setup.log"'
             },
             makeDebian: {
                 // type : 'bat',
@@ -492,7 +494,7 @@ module.exports = function (grunt) {
             console.log('========= Please wait a little (ca 1 min). The msi file will be created in ioBroker/delivery directory after the grunt is finished.');
             console.log('========= you can start batch file .windows-ready\\createSetup.bat manually');
             // Sometimes command:makeWindowsMSI does not work, you can start batch file manually
-            grunt.file.write(gruntDir + '.windows-ready\\createSetup.bat', '"' + gruntDir + 'windows\\InnoSetup5\\ISCC.exe" "' + gruntDir + '.windows-ready\\ioBroker.iss"');
+            grunt.file.write(gruntDir + '.windows-ready\\createSetup.bat', '"' + gruntDir + 'windows\\InnoSetup6\\ISCC.exe" "' + gruntDir + '.windows-ready\\ioBroker.iss"');
         } else {
             console.log('Cannot create windows setup, while host is not windows');
         }
