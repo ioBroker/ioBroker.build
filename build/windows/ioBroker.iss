@@ -220,13 +220,30 @@ Filename: "{code:NodeJsPath}\npx.cmd"; Parameters: "github:iobroker/iobroker#win
 ; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{code:NodeJsPath}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
 Filename: http://localhost:8081/; Description: "{code:GetAdminPageText}"; Flags: postinstall shellexec
 
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\daemon"
+Type: filesandordirs; Name: "{app}\node_modules"
+Type: filesandordirs; Name: "{app}\install"
+Type: filesandordirs; Name: "{app}\iobroker-data"
+Type: filesandordirs; Name: "{app}\log"
+Type: filesandordirs; Name: "{app}\*.js"
+Type: filesandordirs; Name: "{app}\*.md"
+Type: filesandordirs; Name: "{app}\*.cmd"
+Type: filesandordirs; Name: "{app}\*.bat"
+Type: filesandordirs; Name: "{app}\*.json"
+Type: filesandordirs; Name: "{app}\*.ps1"
+Type: filesandordirs; Name: "{app}\*.sh"
+Type: filesandordirs; Name: "{app}\LICENSE"
+Type: filesandordirs; Name: "{app}\semver"
+
 [UninstallRun]
 ; Removes System Service
 Filename: "{code:NodeJsPath}\node.exe"; Parameters: """{app}\uninstall.js"""; Flags: runhidden;
-Filename: "{sys}\del"; Parameters: "/Q /S ""{app}\daemon""";
-Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\daemon""";
-Filename: "{sys}\del"; Parameters: "/Q /S ""{app}\node_modules""";
-Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\node_modules""";
+;Filename: "{sys}\del"; Parameters: "/Q /S ""{app}\daemon""";
+;Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\daemon""";
+;Filename: "{sys}\del"; Parameters: "/Q /S ""{app}\node_modules""";
+;Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\node_modules""";
 ;Filename: "{sys}\net"; Parameters: "stop redis"; Flags: runhidden;
 ;Filename: "{commonpf}\Redis\unins000.exe"
 ;Filename: "{commonpf32}\Apache Software Foundation\CouchDB\unins000.exe"
