@@ -203,9 +203,13 @@ end;
 [Run]
 ; postinstall launch
 Filename: "msiexec.exe"; Parameters: "/i ""{app}\node.msi"" /passive"; Check: NodeJsNeedsInstall
-Filename: "{code:NodeJsPath}\npm.cmd"; Parameters: "install iobroker --prefix ""{app}""";
-Filename: "{code:NodeJsPath}\npm.cmd"; Parameters: "install --production"; WorkingDir: "{app}";
-Filename: "{app}\serviceIoBroker.bat"; Parameters: "start"; WorkingDir: "{app}";
+;
+;Filename: "{code:NodeJsPath}\npm.cmd"; Parameters: "install iobroker --prefix ""{app}""";
+;Filename: "{code:NodeJsPath}\npm.cmd"; Parameters: "install --production"; WorkingDir: "{app}";
+;Filename: "{app}\serviceIoBroker.bat"; Parameters: "start"; WorkingDir: "{app}";
+;
+Filename: "{code:NodeJsPath}\npx.cmd"; Parameters: "github:iobroker/iobroker#windows-installer"; WorkingDir: "{app}";
+;
 ;Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
 ;Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
 ;Filename: "{sys}\net.exe"; Parameters: "start redis"
