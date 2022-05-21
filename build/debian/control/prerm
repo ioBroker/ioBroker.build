@@ -1,7 +1,0 @@
-#!/bin/bash
-
-# Stop the ioBroker
-if [ -d "/opt/iobroker/" ]; then
-    echo "Stopping ioBroker..."
-	node /opt/iobroker/iobroker.js stop || true
-fi

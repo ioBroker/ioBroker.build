@@ -1,9 +1,0 @@
-Package: ioBroker
-Version: @@version
-Section: base
-Priority: optional
-Architecture: @@architecture
-Installed-Size: @@size
-Depends: nodejs
-Maintainer: ioBroker.org <support@ioBroker.org>
-Description: ioBroker is automation platform on NodeJS.

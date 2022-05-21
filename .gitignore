@@ -7,3 +7,4 @@
 /build/.debian-pi-ready
 /build/.debian-pi-control
 /build/windows/nodejs
+/package-lock.json

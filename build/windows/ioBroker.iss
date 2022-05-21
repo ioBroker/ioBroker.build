@@ -5,8 +5,8 @@
 #define MyAppShortName "ioBroker"
 #define MyAppLCShortName "iobroker"
 #define MyAppVersion "@@version"
-#define MyAppPublisher "ioBroker.net"
-#define MyAppURL "http://ioBroker.net/"
+#define MyAppPublisher "ioBroker GmbH"
+#define MyAppURL "https://www.ioBroker.net/"
 #define MyAppIcon "ioBroker.ico"
 
 
@@ -48,16 +48,7 @@ Root: HKLM; Subkey: "Software\Microsoft\Windows Script Host\Settings"; ValueType
 [Files]
 Source: "nodejs\node.msi"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall; Check: not Is64BitInstallMode
 Source: "nodejs\node-x64.msi"; DestDir: "{app}"; DestName: "node.msi"; Flags: ignoreversion deleteafterinstall; Check: Is64BitInstallMode
-;Source: "redis-v2.4.6\redis-2.4.6-setup-32-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: not Is64BitInstallMode
-;Source: "redis-v2.4.6\redis-2.4.6-setup-64-bit.exe"; DestDir: "{app}"; DestName: "redisSetup.exe"; Flags: ignoreversion deleteafterinstall; Check: Is64BitInstallMode
-;Source: "couchDB\couchDBsetup.exe"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall;
-;Source: "*.js"; DestDir: "{app}"; Flags: ignoreversion
-;Source: "install.bat"; DestDir: "{app}"; Flags: ignoreversion
-;Source: "package.json"; DestDir: "{app}"; Flags: ignoreversion
-;Source: "npm.cmd"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
-;Source: "..\.windows-ready\data\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-;Source: "node_modules\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]
@@ -132,16 +123,6 @@ begin
     end;
 end;
 
-function RedisNeedsInstall():boolean;
-begin
-   result := not FileExists(ExpandConstant('{commonpf}\Redis\redis-service.exe'));
-end;
-
-function CouchNeedsInstall():boolean;
-begin
-   result := not FileExists(ExpandConstant('{commonpf32}\Apache Software Foundation\CouchDB\Install.exe'));
-end;
-
 function NodeJsNeedsInstall():boolean;
 var
   ResultCode: integer;
@@ -210,11 +191,6 @@ Filename: "msiexec.exe"; Parameters: "/i ""{app}\node.msi"" /passive"; Check: No
 ;
 Filename: "{code:NodeJsPath}\npx.cmd"; Parameters: "github:iobroker/iobroker#windows-installer"; WorkingDir: "{app}";
 ;
-;Filename: "{app}\redisSetup.exe"; Check: RedisNeedsInstall
-;Filename: "{app}\couchDBsetup.exe"; Parameters: "/SILENT"; Check: CouchNeedsInstall
-;Filename: "{sys}\net.exe"; Parameters: "start redis"
-;Filename: "{app}\install.bat"
-;Filename: "{code:NodeJsPath}\node.exe"; Parameters: """{app}\install.js"""; Flags: runhidden;
 ; Add Firewall Rules
 ; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{code:NodeJsPath}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
 ; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node Out"" program=""{code:NodeJsPath}\node.exe"" dir=out action=allow enable=yes"; Flags: runhidden;
@@ -244,9 +220,6 @@ Filename: "{code:NodeJsPath}\node.exe"; Parameters: """{app}\uninstall.js"""; Fl
 ;Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\daemon""";
 ;Filename: "{sys}\del"; Parameters: "/Q /S ""{app}\node_modules""";
 ;Filename: "{sys}\rmdir"; Parameters: "/Q /S ""{app}\node_modules""";
-;Filename: "{sys}\net"; Parameters: "stop redis"; Flags: runhidden;
-;Filename: "{commonpf}\Redis\unins000.exe"
-;Filename: "{commonpf32}\Apache Software Foundation\CouchDB\unins000.exe"
 ; Remove Firewall Rules
 ; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node In"" program=""{code:NodeJsPath}\node.exe"""; Flags: runhidden;
 ; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""Node Out"" program=""{code:NodeJsPath}\node.exe"""; Flags: runhidden;
