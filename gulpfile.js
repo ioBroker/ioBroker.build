@@ -2,19 +2,12 @@ const gulp = require('gulp');
 const axios = require('axios');
 const fs = require('fs');
 const del = require('del');
-const {version} = require("./package.json");
 
 const nodejsLink86 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x86.msi';
 const nodejsLink64 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x64.msi';
 
 function download(url, file) {
-    return axios(url, {
-        responseType: 'arraybuffer',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/pdf'
-        }
-    })
+    return axios(url, {responseType: 'arraybuffer'})
         .then(response => fs.writeFileSync(file, response.data));
 }
 

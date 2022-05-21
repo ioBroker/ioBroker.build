@@ -14,7 +14,7 @@
   "scripts": {
     "build": "gulp"
   },
-  "homepage": "http://iobroker.net",
+  "homepage": "https://www.iobroker.net",
   "description": "Windows installer for ioBroker",
   "bugs": {
     "url": "https://github.com/ioBroker/ioBroker.build/issues"
