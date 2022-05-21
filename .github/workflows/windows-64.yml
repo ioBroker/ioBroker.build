@@ -10,20 +10,12 @@ jobs:
     - uses: actions/setup-node@v3
       with:
         node-version: 14
-    - name: install grunt
-      run: npm install grunt-cli -g
-      shell: cmd
     - name: install
-      run: npm install
-      shell: cmd
-    - name: run grunt
-      run: grunt
-      shell: cmd
-    - name: create setup
-      run: |
-        createSetup.bat
-      working-directory: build/.windows-ready
-      shell: cmd
+      run: npm i
+
+    - name: build
+      run: npm run build
+
     - uses: actions/upload-artifact@v1
       with:
         name: Windows-installer
