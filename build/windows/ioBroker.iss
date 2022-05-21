@@ -35,6 +35,7 @@ UsePreviousAppDir=yes
 ArchitecturesInstallIn64BitMode=x64
 UninstallDisplayIcon={app}\{#MyAppIcon}
 CloseApplications=yes
+MissingRunOnceIdsWarning=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
