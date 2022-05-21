@@ -11,6 +11,9 @@
     "gulp": "~4.0.2",
     "axios": "^0.27.2"
   },
+  "scripts": {
+    "build": "gulp"
+  },
   "homepage": "http://iobroker.net",
   "description": "Windows installer for ioBroker",
   "bugs": {
