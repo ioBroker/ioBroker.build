@@ -2,19 +2,27 @@ const gulp = require('gulp');
 const axios = require('axios');
 const fs = require('fs');
 const del = require('del');
+const path = require('path');
 
 const nodejsLink86 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x86.msi';
 const nodejsLink64 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x64.msi';
 
 function download(url, file) {
+    const directoryName = path.dirname(file);
+    if (!fs.existsSync(directoryName)) {
+        fs.mkdirSync(directoryName);
+    }
+
     return axios(url, {responseType: 'arraybuffer'})
         .then(response => fs.writeFileSync(file, response.data));
 }
 
-gulp.task('0-clean', () => del(['tmp/**/*', 'build/.windows-ready/**/*']));
-gulp.task('1-nodex86', async () => download(nodejsLink86, __dirname + '/build/windows/nodejs/node.msi'));
-gulp.task('2-nodex64', async () => download(nodejsLink64, __dirname + '/build/windows/nodejs/node-x64.msi'));
+gulp.task('0-clean', () => del(['tmp/**/*', 'build/.windows-ready/**/*', 'delivery/**/*']));
+gulp.task('1-nodex86', () => download(nodejsLink86, __dirname + '/build/windows/nodejs/node.msi'));
+gulp.task('2-nodex64', () => download(nodejsLink64, __dirname + '/build/windows/nodejs/node-x64.msi'));
 gulp.task('3-0-replaceWindowsVersion', async () => {
+    await checkFiles(['build/windows/nodejs/node.msi', 'build/windows/nodejs/node-x64.msi']);
+
     const version = require('./package.json').version;
     !fs.existsSync(__dirname + '/build/.windows-ready') && fs.mkdirSync(__dirname + '/build/.windows-ready');
 
@@ -43,18 +51,12 @@ gulp.task('3-2-copy-nodejs', async () =>
     ])
         .pipe(gulp.dest('build/.windows-ready/nodejs')));
 
-function _checkFiles(callback, index) {
+function _checkFiles(files, callback, index) {
     index = index || 0;
-    const files = [
-        'build/.windows-ready/ioBroker.iss',
-        'build/.windows-ready/nodejs/node.msi',
-        'build/.windows-ready/nodejs/node-x64.msi',
-        'build/.windows-ready/ioBroker.ico'
-    ];
 
     if (files.find(file => !fs.existsSync(__dirname + '/' + file))) {
         if (index < 5) {
-            setTimeout(() => _checkFiles(callback, index + 1), 3000);
+            setTimeout(() => _checkFiles(files, callback, index + 1), 3000);
         } else {
             callback('timeout');
         }
@@ -63,13 +65,18 @@ function _checkFiles(callback, index) {
     }
 }
 
-function checkFiles() {
-    return new Promise((resolve, reject) => _checkFiles(error => error ? reject(error) : resolve()));
+function checkFiles(files) {
+    return new Promise((resolve, reject) => _checkFiles(files, error => error ? reject(error) : resolve()));
 }
 
 function runMSI() {
     return new Promise((resolve, reject) => {
-        checkFiles()
+        checkFiles([
+            'build/.windows-ready/ioBroker.iss',
+            'build/.windows-ready/nodejs/node.msi',
+            'build/.windows-ready/nodejs/node-x64.msi',
+            'build/.windows-ready/ioBroker.ico'
+        ])
             .then(() => {
                 // Install node modules
                 const cwd = __dirname.replace(/\\/g, '/') + '/build/windows/';
