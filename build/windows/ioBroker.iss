@@ -190,7 +190,8 @@ Filename: "msiexec.exe"; Parameters: "/i ""{app}\node.msi"" /passive"; Check: No
 ;Filename: "{code:NodeJsPath}\npm.cmd"; Parameters: "install --production"; WorkingDir: "{app}";
 ;Filename: "{app}\serviceIoBroker.bat"; Parameters: "start"; WorkingDir: "{app}";
 ;
-Filename: "{code:NodeJsPath}\npx.cmd"; Parameters: "github:iobroker/iobroker#windows-installer"; WorkingDir: "{app}";
+;Filename: "{code:NodeJsPath}\npx.cmd"; Parameters: "github:iobroker/iobroker#windows-installer"; WorkingDir: "{app}";
+Filename: "{code:NodeJsPath}\npx.cmd"; Parameters: "iobroker"; WorkingDir: "{app}";
 ;
 ; Add Firewall Rules
 ; Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""Node In"" program=""{code:NodeJsPath}\node.exe"" dir=in action=allow enable=yes"; Flags: runhidden;
