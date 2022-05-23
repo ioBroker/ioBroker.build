@@ -124,6 +124,31 @@ begin
     end;
 end;
 
+function CheckNodeJs(NodeFileName: string): boolean;
+var
+  NodeMS, NodeLS: Cardinal;
+  NodeMajorVersion, NodeMinorVersion: Cardinal;
+begin
+  Log(Format('Found Node.js path %s', [NodeFileName]));
+  Result := GetVersionNumbers(NodeFileName, NodeMS, NodeLS);
+  if not Result then
+  begin
+    result := false;
+  end
+    else
+  begin
+    { NodeMS is 32-bit integer with high 16 bits holding major version and }
+    { low 16 bits holding minor version }
+
+    { shift 16 bits to the right to get major version }
+    NodeMajorVersion := NodeMS shr 16;
+    { select only low 16 bits }
+    NodeMinorVersion := NodeMS and $FFFF;
+    Log(Format('Node.js version is %d.%d', [NodeMajorVersion, NodeMinorVersion]));
+    result := (NodeMajorVersion >= 14);
+  end;
+end;
+
 function NodeJsNeedsInstall():boolean;
 var
   ResultCode: integer;
@@ -140,6 +165,10 @@ begin
 
   if result then begin
     result := not FileExists(ExpandConstant('{commonpf}\nodejs\node.exe'));
+  end;
+
+  if not result then begin
+    result := not CheckNodeJs(ExpandConstant('{commonpf}\nodejs\node.exe'));
   end;
 
   if not DirExists(ExpandConstant('{userappdata}\npm')) then begin
