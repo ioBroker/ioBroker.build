@@ -85,7 +85,7 @@ function runMSI() {
                 console.log(`"${cmd} in ${cwd}`);
 
                 // System call used for update of js-controller itself,
-                // because during installation npm packet will be deleted too, but some files must be loaded even during the install process.
+                // because during installation npm packet will be deleted too, but some files must be loaded even during the installation process.
                 const exec = require('child_process').exec;
                 const child = exec(cmd, {cwd});
 
@@ -120,15 +120,18 @@ function signExe() {
                     throw new Error('NO cert file found');
                 }
 
-                const cmd = `${__dirname}\\build\\windows\\ezsign\\EZSignIt.exe /sn ` +
-                    `"${__dirname}\\delivery\\ioBrokerInstaller.${version}.exe" /f ` +
-                    `"${__dirname}\\ioBrokerCodeSigningCertificate.pfx" ` +
-                    `/p ${process.env.CERT_PASSWORD} /fd sha256 /trs2 "http://timestamp.comodoca.com/?td=sha256"`;
+                const cmd = `${__dirname}\\build\\windows\\ezsign\\EZSignIt.exe ` +
+                    `/sn "${__dirname}\\delivery\\ioBrokerInstaller.${version}.exe" ` +
+                    `/f "${__dirname}\\ioBrokerCodeSigningCertificate.pfx" ` +
+                    `/p ${process.env.CERT_PASSWORD} ` +
+                    `/fd sha256 ` +
+                    `/d "ioBroker windows installer" ` +
+                    `/trs2 "http://timestamp.comodoca.com/?td=sha256"`;
 
-                console.log(`"${cmd}`);
+                console.log(`"${cmd.replace(process.env.CERT_PASSWORD, '*****')}`);
 
                 // System call used for update of js-controller itself,
-                // because during installation npm packet will be deleted too, but some files must be loaded even during the install process.
+                // because during installation npm packet will be deleted too, but some files must be loaded even during the installation process.
                 const exec = require('child_process').exec;
                 const child = exec(cmd);
 
