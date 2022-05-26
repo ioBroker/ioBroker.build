@@ -19,6 +19,9 @@ jobs:
       run: npm i
 
     - name: build
+      env:
+        CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        CERT_FILE: ${{ secrets.CERT_FILE }}
       run: npm run build
 
     - uses: actions/upload-artifact@v1

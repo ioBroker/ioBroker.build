@@ -5,8 +5,8 @@ const del = require('del');
 const path = require('path');
 const version = require('./package.json').version;
 
-const nodejsLink86 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x86.msi';
-const nodejsLink64 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x64.msi';
+const nodejsLink86 = 'https://nodejs.org/download/release/v14.19.3/node-v14.19.3-x86.msi';
+const nodejsLink64 = 'https://nodejs.org/download/release/v14.19.3/node-v14.19.3-x64.msi';
 
 function download(url, file) {
     const directoryName = path.dirname(file);
@@ -116,6 +116,8 @@ function signExe() {
                     fs.writeFileSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx', Buffer.from(process.env.CERT_FILE, 'base64'));
                 } else if (fs.existsSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx') && !fs.existsSync(__dirname + '/ioBrokerCodeSigningCertificate.base64.txt')) {
                     fs.writeFileSync(__dirname + '/ioBrokerCodeSigningCertificate.base64.txt', fs.readFileSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx').toString('base64'));
+                } else if (!fs.existsSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx')) {
+                    throw new Error('NO cert file found');
                 }
 
                 const cmd = `${__dirname}\\build\\windows\\ezsign\\EZSignIt.exe /sn ` +
