@@ -8,3 +8,5 @@
 /build/.debian-pi-control
 /build/windows/nodejs
 /package-lock.json
+/ioBrokerCodeSigningCertificate.pfx
+/ioBrokerCodeSigningCertificate.base64.txt

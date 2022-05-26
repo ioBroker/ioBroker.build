@@ -107,10 +107,52 @@ function runMSI() {
     });
 }
 
+function signExe() {
+    return new Promise((resolve, reject) => {
+        checkFiles(['delivery/ioBrokerInstaller.1.0.0.exe'])
+            .then(() => {
+                // Install node modules
+                if (process.env.CERT_FILE) {
+                    fs.writeFileSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx', Buffer.from(process.env.CERT_FILE, 'base64'));
+                } else if (fs.existsSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx') && !fs.existsSync(__dirname + '/ioBrokerCodeSigningCertificate.base64.txt')) {
+                    fs.writeFileSync(__dirname + '/ioBrokerCodeSigningCertificate.base64.txt', fs.readFileSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx').toString('base64'));
+                }
+
+                const cmd = `${__dirname}\\build\\windows\\ezsign\\EZSignIt.exe /sn ` +
+                    `"${__dirname}\\delivery\\ioBrokerInstaller.1.0.0.exe" /f ` +
+                    `"${__dirname}\\ioBrokerCodeSigningCertificate.pfx" ` +
+                    `/p ${process.env.CERT_PASSWORD} /fd sha256 /trs2 "http://timestamp.comodoca.com/?td=sha256"`;
+
+                console.log(`"${cmd}`);
+
+                // System call used for update of js-controller itself,
+                // because during installation npm packet will be deleted too, but some files must be loaded even during the install process.
+                const exec = require('child_process').exec;
+                const child = exec(cmd);
+
+                child.stderr.pipe(process.stderr);
+                child.stdout.pipe(process.stdout);
+
+                child.on('exit', (code /* , signal */) => {
+                    // code 1 is strange error that cannot be explained. Everything is installed but error :(
+                    if (code && code !== 1) {
+                        reject(new Error('Cannot sign: ' + code));
+                    } else {
+                        console.log(`"${cmd} finished.`);
+                        // command succeeded
+                        resolve();
+                    }
+                });
+            })
+            .catch(error => reject(error));
+    });
+}
+
 gulp.task('3-3-runMSI', runMSI);
+gulp.task('3-4-signExe', signExe);
 
 if (/^win/.test(process.platform)) {
-    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI']));
+    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI', '3-4-signExe']));
 } else {
     gulp.task('3-windows-msi', async () => console.warn('Cannot create windows setup, while host is not windows'));
 }

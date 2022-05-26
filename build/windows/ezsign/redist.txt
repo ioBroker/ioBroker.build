@@ -1,0 +1,28 @@
+EZSignIt Code Signer 
+Redistribution License
+
+This Redistribution license applies to those looking to actually redistribute the EZSignIt Code Signer program/tool(s) which includes EZSignIt.exe and EZSignUtil.exe.
+
+Unlike Microsoft's SignTool.exe tool which is not allowed to be redistributed, EZSignIt generally is allowed to be freely redistributed subject to the conditions below:
+
+1) There are only two authorized ways to redistribute EZSignIt.  The first is by distributing the actual self-extracting .EXE installer that was obtained from http://www.ssesetup.com/ezsignit.html (author's official website).  If you go this route, and you are installing EZSignIt along with a program of yours, you can optionally choose to install the package silently with the /SILENT command-line switch and/or can also specify a default installation folder with the /D switch on the installer - run the installer with the /? switch for more info.  Distributing the installer .EXE is recommended because it will help ensure the user meets the necessary requirements to use EZSignIt and it can download the .NET Framework if it is needed.
+
+The second allowed method of distribution is to distribute the entire contents of the .ZIP package that was obtained from http://www.ssesetup.com/ezsignit.html (author's official website).  In this case, you do not have to distribute the .ZIP file by itself, but EVERYTHING inside the .ZIP file MUST be included for distribution in unmodified form in the exact same file/folder structure as it is inside the .ZIP file and it should all be installed to a clearly named folder specifying "EZSignIt" (minus quotes) in the folder name.
+
+2) Again, whether you distribute the .EXE installer or the .ZIP (or contents thereof), the .EXE or .ZIP MUST have been downloaded/obtained via the author's official website (http://www.ssesetup.com/ezsignit.html)
+
+3) You are NOT allowed to delete or modify any files or information from the .EXE installer or the .ZIP.
+
+4) If you redistribute EZSignIt with a software package, you MUST add the following paragraph into the license agreement and/or legal text for your software, and you must some way force the user to agree to this text (i.e. as a part of the license agreement they must agree to when installing your software, etc.):
+
+The bundled EZSignIt software is provided "as is" without any guarantees or warranty. It is your responsibility to safeguard your data and back up any files before using them with EZSignIt or this software. In connection with the EZSignIt software, EZSignIt developer Chris Long makes no warranties of any kind, either express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, of title, or of non-infringement of third party rights. Use of the EZSignIt software by a user is at the user's risk and is deemed acceptance of these terms. IN NO EVENT WILL CHRIS LONG BE LIABLE FOR ANY INDIRECT, CONSEQUENTIAL, INCIDENTAL, SPECIAL, PUNITIVE OR OTHER DAMAGES WHATSOEVER INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF PROFITS, LOSS OF DATA, LOSS OF GOODWILL OR BUSINESS INTERRUPTION, EVEN IF CHRIS LONG HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES, OR FOR ANY CLAIM BY ANOTHER PARTY.  EZSignIt developer Chris Long is also not in any way responsible or liable for usage of EZSignIt when it is included with or as a part of a third-party product.
+
+5) By default EZSignIt itself will force new users to agree to a legal agreement before use if it was not installed via the .EXE installer mentioned in item 1 and even if it was installed via the .EXE, it may still force any users other than the current user to agree before use.  As long as you complete item 4 above and in some way force your users to actively agree to the statement given in item 4 (in your installer or program, etc.) then you are authorized to set a registry value via your program or installer that will prevent EZSignIt from showing the agreement on its own.  To do so you need to create the following registry key if it does not exist: "HKEY_CURRENT_USER\Software\EZSignIt" and once you have created that key you will need to create a REG_SZ string value in that key of "LGStatus" that has value data set to "1" (again note this is a REG_SZ and not a REG_DWORD value).  While setting this will work fine for the current user, if your software may be used by other users on the machine, then as long as you ensure that the other users also will have to see and agree to the paragraph given in item 4, then you can set a system-wide setting instead (though your installer or program will need Elevated rights to do that of course).  In this case you would instead create the key as "HKEY_LOCAL_MACHINE\Software\EZSignIt" if that key doesn't exist and then create the REG_SZ string "LGStatus" value set to "1" in there instead (it is irrelevant whether you use the 32-bit or 64-bit Registry view to do this as EZSignIt can find it in either).
+
+6) You must not redistribute EZSignIt with any software of an obviously bad or questionable nature (i.e. malware of any kind such as spyware).
+
+7) If your product that you are wanting to include EZSignIt with (or use it for) is a program that creates installers/Setup files (your product is an installer), this is not allowed and not authorized.  You are not allowed to redistribute EZSignIt in this scenario.
+
+As long as you follow and adhere to the conditions above, you are allowed to redistribute EZSignIt.
+
+EZSignIt is Copyright by Chris Long 2021.  All rights are reserved.
