@@ -3,6 +3,7 @@ const axios = require('axios');
 const fs = require('fs');
 const del = require('del');
 const path = require('path');
+const version = require('./package.json').version;
 
 const nodejsLink86 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x86.msi';
 const nodejsLink64 = 'https://nodejs.org/download/release/v14.19.2/node-v14.19.2-x64.msi';
@@ -23,7 +24,6 @@ gulp.task('2-nodex64', () => download(nodejsLink64, __dirname + '/build/windows/
 gulp.task('3-0-replaceWindowsVersion', async () => {
     await checkFiles(['build/windows/nodejs/node.msi', 'build/windows/nodejs/node-x64.msi']);
 
-    const version = require('./package.json').version;
     !fs.existsSync(__dirname + '/build/.windows-ready') && fs.mkdirSync(__dirname + '/build/.windows-ready');
 
     let iss = fs.readFileSync(__dirname + '/build/windows/ioBroker.iss').toString('utf8');
@@ -58,7 +58,7 @@ function _checkFiles(files, callback, index) {
         if (index < 5) {
             setTimeout(() => _checkFiles(files, callback, index + 1), 3000);
         } else {
-            callback('timeout');
+            callback('timeout ' + file);
         }
     } else {
         callback(null);
@@ -109,7 +109,7 @@ function runMSI() {
 
 function signExe() {
     return new Promise((resolve, reject) => {
-        checkFiles(['delivery/ioBrokerInstaller.1.0.0.exe'])
+        checkFiles([`delivery/ioBrokerInstaller.${version}.exe`])
             .then(() => {
                 // Install node modules
                 if (process.env.CERT_FILE) {
