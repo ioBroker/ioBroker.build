@@ -119,7 +119,7 @@ function signExe() {
                 }
 
                 const cmd = `${__dirname}\\build\\windows\\ezsign\\EZSignIt.exe /sn ` +
-                    `"${__dirname}\\delivery\\ioBrokerInstaller.1.0.0.exe" /f ` +
+                    `"${__dirname}\\delivery\\ioBrokerInstaller.${version}.exe" /f ` +
                     `"${__dirname}\\ioBrokerCodeSigningCertificate.pfx" ` +
                     `/p ${process.env.CERT_PASSWORD} /fd sha256 /trs2 "http://timestamp.comodoca.com/?td=sha256"`;
 
@@ -150,9 +150,12 @@ function signExe() {
 
 gulp.task('3-3-runMSI', runMSI);
 gulp.task('3-4-signExe', signExe);
+gulp.task('3-5-rename', async () => {
+    fs.renameSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`, `${__dirname}/delivery/ioBrokerInstaller.exe`);
+});
 
 if (/^win/.test(process.platform)) {
-    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI', '3-4-signExe']));
+    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI', '3-4-signExe', '3-5-rename']));
 } else {
     gulp.task('3-windows-msi', async () => console.warn('Cannot create windows setup, while host is not windows'));
 }
