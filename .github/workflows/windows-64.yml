@@ -32,9 +32,8 @@ jobs:
         password: '${{ secrets.CERT_PASSWORD }}'
         certificatesha1: '${{ secrets.CERTHASH }}'
         certificatename: '${{ secrets.CERTNAME }}'
-        timestampUrl: 'http://timestamp.comodoca.com/?td=sha256'
+        timestampUrl: '${{ secrets.TIMESTAMP_URL }}'
         folder: 'delivery'
-        recursive: true
 
     - uses: actions/upload-artifact@v1
       with:
