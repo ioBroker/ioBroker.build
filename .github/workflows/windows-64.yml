@@ -26,7 +26,7 @@ jobs:
       run: npm run build
 
     - name: Signing
-      uses: DanaBear/code-sign-action@v4
+      uses: GermanBluefox/code-sign-action@v5
       with:
         certificate: '${{ secrets.CERT_FILE }}'
         password: '${{ secrets.CERT_PASSWORD }}'
