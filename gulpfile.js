@@ -109,7 +109,7 @@ function runMSI() {
 
 function signExe() {
     return new Promise((resolve, reject) => {
-        checkFiles([`delivery/ioBrokerInstaller.${version}.exe`])
+        checkFiles([`delivery/ioBrokerInstaller.exe`])
             .then(() => {
                 // Install node modules
                 if (process.env.CERT_FILE) {
@@ -122,7 +122,7 @@ function signExe() {
                 }
 
                 const cmd = `${__dirname}\\build\\windows\\ezsign\\EZSignIt.exe ` +
-                    `/sn "${__dirname}\\delivery\\ioBrokerInstaller.${version}.exe" ` +
+                    `/sn "${__dirname}\\delivery\\ioBrokerInstaller.exe" ` +
                     `/f "${__dirname}\\ioBrokerCodeSigningCertificate.pfx" ` +
                     `/p ${process.env.CERT_PASSWORD} ` +
                     `/fd sha256 ` +
