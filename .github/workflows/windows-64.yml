@@ -32,7 +32,6 @@ jobs:
         password: '${{ secrets.CERT_PASSWORD }}'
         certificatesha1: '${{ secrets.CERTHASH }}'
         certificatename: '${{ secrets.CERTNAME }}'
-        timestampUrl: '${{ secrets.TIMESTAMP_URL }}'
         folder: 'delivery'
 
     - uses: actions/upload-artifact@v1
