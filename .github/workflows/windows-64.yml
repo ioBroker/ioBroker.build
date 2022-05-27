@@ -24,6 +24,17 @@ jobs:
         CERT_FILE: ${{ secrets.CERT_FILE }}
       run: npm run build
 
+    - name: Signing
+      uses: DanaBear/code-sign-action@v4
+      with:
+        certificate: '${{ secrets.CERT_FILE }}'
+        password: '${{ secrets.CERT_PASSWORD }}'
+        certificatesha1: '${{ secrets.CERTHASH }}'
+        certificatename: '${{ secrets.CERTNAME }}'
+        folder: 'delivery'
+        recursive: true
+
+    - name: Upload
     - uses: actions/upload-artifact@v1
       with:
         name: Windows-installer

@@ -130,7 +130,7 @@ function signExe() {
                     `/d "ioBroker windows installer" ` +
                     `/trs2 "http://timestamp.comodoca.com/?td=sha256"`;
 
-                console.log(`"${cmd.replace(process.env.CERT_PASSWORD, '*****' + (process.env.CERT_PASSWORD.lenght + 5))}`);
+                console.log(`"${cmd.replace(process.env.CERT_PASSWORD, '*****' + ((process.env.CERT_PASSWORD || '').lenght + 5))}`);
 
                 // System call used for update of js-controller itself,
                 // because during installation npm packet will be deleted too, but some files must be loaded even during the installation process.
@@ -142,8 +142,17 @@ function signExe() {
 
                 child.on('exit', (code /* , signal */) => {
                     // code 1 is strange error that cannot be explained. Everything is installed but error :(
-                    if (code && code !== 1) {
-                        reject(new Error('Cannot sign: ' + code));
+                    if (code) {
+                        const exitCodes = [
+                            '0 = Success',
+                            '1 = Invalid command-line or general program error',
+                            '2 = Certificate password is incorrect',
+                            '3 = Certificate could not be added / General certificate signing error',
+                            '4 = Timestamp not added / Timestamp server-related error',
+                            '5 = Signature Validation failed',
+                        ];
+
+                        reject(new Error(`Cannot sign: ${exitCodes[code]} (${code})`));
                     } else {
                         console.log(`"${cmd} finished.`);
                         // command succeeded
@@ -156,16 +165,16 @@ function signExe() {
 }
 
 gulp.task('3-3-runMSI', runMSI);
-gulp.task('3-4-signExe-manually', signExe);
-gulp.task('3-5-rename-manually', async () => {
+gulp.task('3-4-rename', async () => {
     if (fs.existsSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`) && fs.existsSync(`${__dirname}/delivery/ioBrokerInstaller.exe`)) {
         fs.unlinkSync(`${__dirname}/delivery/ioBrokerInstaller.exe`);
     }
     fs.renameSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`, `${__dirname}/delivery/ioBrokerInstaller.exe`);
 });
+gulp.task('3-5-signExe-manually', signExe);
 
 if (/^win/.test(process.platform)) {
-    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI']));
+    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI', '3-4-rename']));
 } else {
     gulp.task('3-windows-msi', async () => console.warn('Cannot create windows setup, while host is not windows'));
 }
