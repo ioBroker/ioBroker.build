@@ -122,7 +122,7 @@ function signExe() {
                 }
 
                 const cmd = `${__dirname}\\build\\windows\\ezsign\\EZSignIt.exe ` +
-                    `/sn "${__dirname}\\delivery\\ioBrokerInstaller.exe" ` +
+                    `/sn "${__dirname}\\delivery\\iobroker-installer.exe" ` +
                     `/f "${__dirname}\\ioBrokerCodeSigningCertificate.pfx" ` +
                     `/p ${process.env.CERT_PASSWORD} ` +
                     `/fd sha256 ` +
@@ -166,10 +166,10 @@ function signExe() {
 
 gulp.task('3-3-runMSI', runMSI);
 gulp.task('3-4-rename', async () => {
-    if (fs.existsSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`) && fs.existsSync(`${__dirname}/delivery/ioBrokerInstaller.exe`)) {
-        fs.unlinkSync(`${__dirname}/delivery/ioBrokerInstaller.exe`);
+    if (fs.existsSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`) && fs.existsSync(`${__dirname}/delivery/iobroker-installer.exe`)) {
+        fs.unlinkSync(`${__dirname}/delivery/iobroker-installer.exe`);
     }
-    fs.renameSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`, `${__dirname}/delivery/ioBrokerInstaller.exe`);
+    fs.renameSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`, `${__dirname}/delivery/iobroker-installer.exe`);
 });
 gulp.task('3-5-signExe-manually', signExe);
 
