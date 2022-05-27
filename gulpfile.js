@@ -160,7 +160,7 @@ gulp.task('3-5-rename', async () => {
 });
 
 if (/^win/.test(process.platform)) {
-    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI', '3-4-signExe', '3-5-rename']));
+    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI']));
 } else {
     gulp.task('3-windows-msi', async () => console.warn('Cannot create windows setup, while host is not windows'));
 }
