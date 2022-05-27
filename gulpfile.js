@@ -58,7 +58,7 @@ function _checkFiles(files, callback, index) {
         if (index < 5) {
             setTimeout(() => _checkFiles(files, callback, index + 1), 3000);
         } else {
-            callback('timeout ' + file);
+            callback('timeout ' + files.join(', '));
         }
     } else {
         callback(null);
@@ -156,13 +156,16 @@ function signExe() {
 }
 
 gulp.task('3-3-runMSI', runMSI);
-gulp.task('3-4-signExe', signExe);
-gulp.task('3-5-rename', async () => {
+gulp.task('3-4-signExe-manually', signExe);
+gulp.task('3-5-rename-manually', async () => {
+    if (fs.existsSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`) && fs.existsSync(`${__dirname}/delivery/ioBrokerInstaller.exe`)) {
+        fs.unlinkSync(`${__dirname}/delivery/ioBrokerInstaller.exe`);
+    }
     fs.renameSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`, `${__dirname}/delivery/ioBrokerInstaller.exe`);
 });
 
 if (/^win/.test(process.platform)) {
-    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI', '3-4-signExe', '3-5-rename']));
+    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI']));
 } else {
     gulp.task('3-windows-msi', async () => console.warn('Cannot create windows setup, while host is not windows'));
 }
