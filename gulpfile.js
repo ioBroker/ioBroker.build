@@ -130,7 +130,7 @@ function signExe() {
                     `/d "ioBroker windows installer" ` +
                     `/trs2 "http://timestamp.comodoca.com/?td=sha256"`;
 
-                console.log(`"${cmd.replace(process.env.CERT_PASSWORD, '*****' + ((process.env.CERT_PASSWORD || '').lenght + 5))}`);
+                console.log(`"${cmd.replace(process.env.CERT_PASSWORD, '*****' + ((process.env.CERT_PASSWORD || '').length + 5))}`);
 
                 // System call used for update of js-controller itself,
                 // because during installation npm packet will be deleted too, but some files must be loaded even during the installation process.
