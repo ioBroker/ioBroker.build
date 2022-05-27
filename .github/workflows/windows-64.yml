@@ -26,7 +26,7 @@ jobs:
       run: npm run build
 
     - name: Signing
-      uses: GermanBluefox/code-sign-action@v6
+      uses: GermanBluefox/code-sign-action@v7
       with:
         certificate: '${{ secrets.CERT_FILE }}'
         password: '${{ secrets.CERT_PASSWORD }}'
