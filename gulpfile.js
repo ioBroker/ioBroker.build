@@ -114,6 +114,7 @@ function signExe() {
                 // Install node modules
                 if (process.env.CERT_FILE) {
                     fs.writeFileSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx', Buffer.from(process.env.CERT_FILE, 'base64'));
+                    console.log('Saved ' + Buffer.from(process.env.CERT_FILE, 'base64').length  + ' bytes in certificate');
                 } else if (fs.existsSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx') && !fs.existsSync(__dirname + '/ioBrokerCodeSigningCertificate.base64.txt')) {
                     fs.writeFileSync(__dirname + '/ioBrokerCodeSigningCertificate.base64.txt', fs.readFileSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx').toString('base64'));
                 } else if (!fs.existsSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx')) {
@@ -125,10 +126,11 @@ function signExe() {
                     `/f "${__dirname}\\ioBrokerCodeSigningCertificate.pfx" ` +
                     `/p ${process.env.CERT_PASSWORD} ` +
                     `/fd sha256 ` +
+                    `/nse ` +
                     `/d "ioBroker windows installer" ` +
                     `/trs2 "http://timestamp.comodoca.com/?td=sha256"`;
 
-                console.log(`"${cmd.replace(process.env.CERT_PASSWORD, '*****')}`);
+                console.log(`"${cmd.replace(process.env.CERT_PASSWORD, '*****' + (process.env.CERT_PASSWORD.lenght + 5))}`);
 
                 // System call used for update of js-controller itself,
                 // because during installation npm packet will be deleted too, but some files must be loaded even during the installation process.
@@ -160,7 +162,7 @@ gulp.task('3-5-rename', async () => {
 });
 
 if (/^win/.test(process.platform)) {
-    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI']));
+    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI', '3-4-signExe', '3-5-rename']));
 } else {
     gulp.task('3-windows-msi', async () => console.warn('Cannot create windows setup, while host is not windows'));
 }

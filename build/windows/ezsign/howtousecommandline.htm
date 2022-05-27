@@ -1,0 +1,131 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+
+
+   <title>How to Use EZSignIt from the Command-Line</title>
+   <meta name="generator" content="" />
+   <meta name="keywords" content="" />
+   <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />
+   <meta http-equiv="Content-Style-Type" content="text/css" />
+   <link type="text/css" href="default.css" rel="stylesheet" />
+</head>
+<body style="margin: 0px 0px 0px 0px; background: #EFEFEF;" link="blue" vlink="blue" alink="blue">
+
+
+
+<!-- Placeholder for topic body. -->
+<table width="100%" border="0" cellspacing="0" cellpadding="5"><tr valign="top"><td align="left">
+<p style="text-align: center;"><span style="font-size: 28pt; font-weight: bold; color: #000080;">How to Use EZSignIt from the Command-Line</span></p>
+<p><span style="font-size: 14pt; font-weight: bold; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">You can digitally sign files using the command-line, but this of course is only for advanced users.&nbsp; The only real usefulness of this is if you want to sign files automatically as a part of some other process, such as a batch file.&nbsp; If you haven't yet done so, you should first familiarize yourself with the GUI and read all the info about that in <a href="howtouse.htm">How to Use EZSignIt</a> before attempting to use EZSignIt from the command-line.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Basically you need to run the EZSignIt.exe file with several command-line switches, each with a space in between them.&nbsp; The signing will be done silently (you will receive no feedback) unless an error occurred (though this can be disabled with the /NSE switch below).&nbsp; </span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #800000;">WARNING: EZSignIt does NOT ever back up any files it signs when being run from the command-line.&nbsp; You should always have your own back up of any files you intend to sign BEFORE you sign them.&nbsp; Once a digital signature is applied to a file (even if it is an incorrect signature or has a problem with it) you cannot generally remove it!</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">EZSignIt will return one of the following exit codes (return codes) to indicate success or failure.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">0 = Success</span></p>
+<p><span style="font-size: 12pt; color: #000080;">1 = Invalid command-line or general program error</span></p>
+<p><span style="font-size: 12pt; color: #000080;">2 = Certificate password is incorrect</span></p>
+<p><span style="font-size: 12pt; color: #000080;">3 = Certificate could not be added / General certificate signing error</span></p>
+<p><span style="font-size: 12pt; color: #000080;">4 = Timestamp not added / Timestamp server-related error</span></p>
+<p><span style="font-size: 12pt; color: #000080;">5 = Signature Validation failed</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">FORMAT &amp; SAMPLE COMMAND-LINE</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">The format is somewhat similar to Microsoft's SignTool.exe program, but it is different.&nbsp; Use a space in between each switch and any data for the switch, and make sure you use quotes around any file paths or anything that has a space or forward slash (/) in the data (i.e. URL's).</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Sample command-line:</span></p>
+<p><span style="font-size: 12pt; color: #000080;">EZSignIt.exe /sn "C:\My Folder\MyFile.exe" /f "C:\MyFolder\MyCert.PFX" /p MyPassword /fd sha256 /trs2 "http://timestamp.comodoca.com/?td=sha256"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">COMMAND-LINE SWITCHES</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/sn &lt;file&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Required. This is the file to sign or the list of files to sign (a .ezf filelist created using the GUI).&nbsp; It is the full path to the file or filelist.&nbsp; You should surround the path in quotes (especially if there are spaces in the path).&nbsp; You can use absolute or relative paths, but if it's relative and it has any subfolders, you need to start with a dot and backslash.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example: /file "C:\My Folder\MyFile.exe"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example: /file ".\Subfolder1\myfilelist.ezf"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/d &lt;description&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Optional. This is the description to use for the file.&nbsp; If you use this, it may show in place of the filename or file's internal description in any UAC dialogs to the user.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example: /d "ABC Program 1.0 by XYZ Software"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/du &lt;url&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Optional. This is a description URL where the user can get more info on the file.&nbsp; Generally, I believe there is little point in using this setting for most people as I don't know of anywhere that it is actually used for any meaningful/practical reason (I could be wrong of course).</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example: /du "http://www.mywebsite.com"</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/f &lt;certificate&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Required. This is where you specify your certificate.&nbsp; This is either the full path to a .PFX or .P12 certificate file surrounded in quotes, or it could be the name the certificate was issued to or the SHA1 thumbprint (hash) of the certificate.&nbsp; If it's not a PFX/P12 file and is instead a name or thumbprint, then you are telling EZSignIt to look to the local certificate store on your computer for the certificate.&nbsp; This means your password setting (below) has no effect and you will likely be prompted at every sign to enter your password.&nbsp; If your certificate is a newer "Extended Validation" / "EV" certificate that uses a hardware-based (i.e. USB dongle) certificate, then you will have no choice but to specify the certificate by name or thumbprint.&nbsp; When specifying name, be advised that you should put the full name the certificate was issued to in order to have the greatest chance of EZSignIt picking the right certificate (it will use partial info to pick a "best match").&nbsp; For thumbprint, that is usually a 40-character string of letters/numbers representing the certificate - when viewing your certificate, look for the option that says "Thumbprint", "SHA1 thumbprint" or "SHA1 hash" or similar and use that string (remove all spaces from it first).&nbsp; Because the total command-line is limited to 260 characters, using the thumbprint from the command-line can be problematic if you are also using lots of other settings, so it is not generally recommended.&nbsp; </span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Note: If you specify a name or thumbprint instead of a file, you may see a console window during the signing and be more likely to be prompted (by Windows) to enter a password or give consent to allow signing.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Remember to surround your file or name in quotes if it has any spaces or forward slashes (/) in it.&nbsp; If it is a file, you can use absolute or relative paths, but if it's relative and it has any subfolders, you need to start it with a dot and backslash.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example 1: /f "C:\My Folder\abc.pfx"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example 2: /f "Billy Bob Software Inc."</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example 3: /f a42eacf4d802b39e7d831f79a53ce9295221ea16</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/p &lt;password&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">If you specified a PFX/P12 file for your certificate with /f (see above) as opposed to specifying a name or thumbprint, then use this to specify the password to the PFX/P12 file here (unless for some odd reason the PFX/P12 file was not password protected) so that the private key information of the file may be accessed.&nbsp; If you specified a name or thumbprint for your certificate with /f, then if the certificate is an EV (Extended Validation) one using a smart card/dongle, you can optionally use this to specify your smart card pin and EZSignIt's built-in signer may be able to use that to avoid Windows having to prompt you for it (this is untested however and requires you to have the .NET Framework 4.7 or higher).&nbsp; Otherwise, do not use this.</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example: /p "My Password"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #800000;">WARNING: Please take care to safeguard this password or pin from eyes that shouldn't see it, especially if you are going to run EZSignIt from a batch file or something.&nbsp; This password should be kept ultra-secret!!&nbsp; If you provide it via command-line, it may be visible to, or discoverable by, other users or software running on the machine.</span></p>
+<p><span style="font-size: 12pt; color: #800000;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/fd &lt;algorithm&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">This specifies the algorithm to use for the signing and also affects the timestamping.&nbsp; Choices are: SHA1, SHA256, SHA384, SHA512, and DUAL.&nbsp; If you don't use this setting, then the default will be SHA-384 and the SHA2 timestamper is also used if specified (see below).&nbsp; If you specify SHA256, SHA384, or SHA512, then SHA2 timestamper is used if specified (see below).&nbsp; If you specify DUAL, that means you want to DUAL-SIGN with both SHA-1 and SHA-256.&nbsp; Unlike SignTool which requires 2 different calls to its program to dual-sign, you only call EZSignIt once by specifying DUAL.&nbsp; Using dual-signing generally requires Windows 8 or above (though there is a <a href="howtouse.htm#Win7Dual">workaround</a> to get it working on Windows 7).&nbsp; If you do use DUAL then be advised that your SHA2 timestamper MUST be specified with /trs2 instead of /ts2 (see below).</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">Timestamper settings</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Note: There are 4 different timestamper options, but which one you will use depends on your /fd switch above.&nbsp; If you specified SHA1 for your /fd switch, then you will use either /ts1 or /trs1 (normally you'd use /ts1 in this case).&nbsp; If you specified SHA256, SHA384, or SHA512 for your /fd switch, then you will use either /ts2 or /trs2 (normally you'd use /trs2 in this case).&nbsp; If you specified DUAL for /fd then you will use one of the SHA1 timestamp options and also one of the SHA2 ones (normally you'd use /ts1 for SHA1 and /trs2 for SHA2).&nbsp; Note that you do not have to provide any timestamping (not use any of these switches) but it is highly recommended because without it, Windows may not trust your signed file - especially once your certificate expires.&nbsp; </span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Note: It is BEST if you use one of the provided timestamper URL's by just specifying the corresponding number as explained in the options below rather than actually specifying a URL.&nbsp; This is to conserve command-line space since the command-line is limited to 260 characters.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Note for those familiar with SignTool: For convenience-sake, the /t and /tr options that SignTool uses also will work. /t will automatically map to /ts1 and /tr will automatically map to /trs2.&nbsp; Also, just an FYI: SignTool uses a /td switch to specify timestamper algorithm which while still technically existing for EZSignIt, you don't normally need to use as EZSignIt automatically attempts to use the same timestamper algorithm in accordance with your /fd switch.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Make sure you surround any URL's you use in quotes!</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #800000;">Warning: If you use timestamping, you obviously will need to make sure you are always connected to the Internet when running EZSignIt!&nbsp; You also may need to configure any firewalls to allow EZSignIt and/or EZSignUtil.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/ts1 or /t &lt;SHA1 Authenticode Timestamper&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">If your signing algorithm as set by /fd is SHA1 or DUAL, then using this switch allows you to provide a SHA1 Timestamper URL that will sign an Authenticode timestamp.&nbsp; You must specify a URL for this setting.&nbsp; </span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example: /ts1 "http://timestamp.globalsign.com/scripts/timstamp.dll"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/trs1 &lt;SHA1 RFC-3161 Timestamper&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">If your signing algorithm as set by /fd is SHA1 or DUAL, then using this switch allows you to provide a SHA1 Timestamper that will sign an RFC-3161 timestamp.&nbsp; Generally speaking, for SHA1, you should instead use the /ts1 option.&nbsp; You must specify a URL for this setting.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example: /trs1 "http://timestamp.globalsign.com/scripts/timstamp.dll"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/ts2 &lt;SHA2 Authenticode Timestamper&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">If your signing algorithm as set by /fd is SHA256, SHA384, or SHA512, then using this switch allows you to provide a Timestamper that will sign an Authenticode timestamp.&nbsp; Note that most timestamp servers do NOT support Authenticode timestamps and thus you probably want to instead use the /trs2 option.&nbsp; You can either specify a URL or you can just put a number from 1 to 5 that will then correspond with the provided Timestamper URL's in the GUI.&nbsp; </span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example: /ts2 "http://timestamp.globalsign.com/?signature=sha2"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example 2: /ts2 4&nbsp;&nbsp; (this corresponds with http://timestamp.globalsign.com/?signature=sha2)</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/trs2 or /tr &lt;SHA2 RFC-3161 Timestamper&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">If your signing algorithm as set by /fd is SHA256, SHA384, SHA512, or DUAL, then using this switch allows you to provide a SHA-256 Timestamper that will sign an RFC-3161 timestamp.&nbsp; You can either specify a URL or you can just put a number from 1 to 5 that will then correspond with the provided SHA2 Timestamper URL's in the GUI.&nbsp; </span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example: /trs2 "http://timestamp.comodoca.com"</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Example 2: /trs2 2&nbsp;&nbsp; (this corresponds with http://timestamp.digicert.com)</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/td &lt;algorithm&gt;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Optional and rarely used/needed.&nbsp; Unlike SignTool which uses /td to specify the timestamper algorithm, EZSignIt automatically requests the right timestamper algorithm in accordance with the algorithm specified in /fd.and thus you normally don't need to use this switch.&nbsp; The ONLY real possible use to you specifying a timestamper algorithm yourself is if you specifically want to have a timestamp of a different algorithm such as signing with SHA-512 but timestamping with SHA-256.&nbsp; In that case you can use this setting to request the different timestamp algorithm.&nbsp; Be advised that regardless of what you set or what EZSignIt requests for timestamper algorithm, that many timestamper servers ignore and just do what they want to do regardless.&nbsp; </span><span style="font-size: 12pt; color: #000080;">Choices are: SHA1, SHA256, SHA384, SHA512, or you can specify an OID of an algorithm.&nbsp; If you use this, your timestamper will probably need to be specified with the /trs2 (/tr) switch.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/as</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Optional.&nbsp; This option should rarely need to be used.&nbsp; SignTool uses the /as option to append a signature to do dual-signing, but EZSignIt supports dual-signing by just specifying "DUAL" for the /fd parameter making the need for /as mostly irrelevant.&nbsp; However, if you do want to manually append a signature, this is the switch to use.&nbsp; It will append the signature to an existing one (if any) rather than replacing the existing one.&nbsp; Note that you should only use this to append one signature to one existing one.&nbsp; If there are already two or more signatures, you should NOT use this as timestamping will not work correctly with more than 2 signatures.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/nse</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Optional.&nbsp; This specifies that no error windows will show under any circumstances.&nbsp; Normally the signing will be silent unless an error occurs in which case it will show to you.&nbsp; This suppresses those error messages, but note that by doing so, you will be limited to the exit code/return code to determine what went wrong, which will only be of help for a few specific errors (see above).</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/ndm</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Optional.&nbsp; Usually when files are signed, their modified dates becomes the current date.&nbsp; If you want to have your signed files retain their pre-signed modified date (also possibly created and accessed dates) then use this switch. If you have backed up the pre-existing files manually or otherwise still have the files, this could make it harder to distinguish between the previous files and newly signed files - though a signed file will be larger in filesize than a non-signed one.&nbsp; Obviously things can get confusing fast if you use this switch, so use this option with great care.&nbsp; Just FYI: The date/time of files does not determine the validity of the certificate or acceptability of the files by the Operating System, as that is controlled by the certificate itself and the timestamp provided by the Timestamp server.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; font-weight: bold; color: #000080;">/nogp</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Optional. Stands for "no group".&nbsp; This only applies for the built-in signer and it specifies to process files in a filelist (.EZF file) not all at once but each file individually.&nbsp; By default, the built-in signer processes all files in a filelist together so that only 1 call to the signer is needed.&nbsp; The benefit to the default behavior is that if Windows needs to prompt for credentials, it won't need to do so for each file but only once for the whole group.&nbsp; If you use this switch then it will instead process each file separately (much like SignTool does) but the downside to this is that it could mean credential prompts by Windows for each file in the filelist.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+<p><span style="font-size: 12pt; color: #000080;">/</span><span style="font-size: 12pt; font-weight: bold; color: #000080;">use ST</span></p>
+<p><span style="font-size: 12pt; color: #000080;">Optional.&nbsp; Makes the signer be SignTool instead of the built-in signer.&nbsp; If you want to use this, you need to ensure that signtool.exe is either in the same folder as EZSignIt.exe or if not then that you have previously specified the SignTool path in the EZSignIt GUI interface (Advanced button).&nbsp; The only possible reason to use EZSignIt from the command-line to sign with SignTool instead of signing with SignTool directly from the command-line is that EZSignIt can sign multiple files from a filelist.&nbsp; But normally, you shouldn't be needing to use SignTool anyway as the built-in signer should normally be sufficient.&nbsp; To use SignTool, just specify as /use ST.&nbsp; If you previously set up for SignTool to use additional command-line options in the GUI (Advanced button), then those will be used as well when signing via the command-line.</span></p>
+<p><span style="font-size: 12pt; color: #000080;">&nbsp;</span></p>
+
+</td></tr></table>
+
+</body>
+</html>
