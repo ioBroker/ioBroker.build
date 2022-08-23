@@ -109,7 +109,7 @@ function runMSI() {
 
 function signExe() {
     return new Promise((resolve, reject) => {
-        checkFiles([`delivery/ioBrokerInstaller.exe`])
+        checkFiles([`delivery/iobroker-installer.exe`])
             .then(() => {
                 // Install node modules
                 if (process.env.CERT_FILE) {
@@ -154,7 +154,7 @@ function signExe() {
 
                         reject(new Error(`Cannot sign: ${exitCodes[code]} (${code})`));
                     } else {
-                        console.log(`"${cmd} finished.`);
+                        console.log(`"${cmd.replace(process.env.CERT_PASSWORD, `*****${(process.env.CERT_PASSWORD || '').length + 5}`)}" finished successfully.`);
                         // command succeeded
                         resolve();
                     }

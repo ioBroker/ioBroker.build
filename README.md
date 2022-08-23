@@ -1,8 +1,8 @@
 # ioBroker.build
 
-Build installation packages for ioBroker.
+Windows installer Build installation packages for ioBroker.
 
-Prerequires:
+Pre-requires:
 - Node JS with NPM
 - Windows to build .exe and debian to build .deb
 - Internet connection, because the **ioBroker.nodejs** will be downloaded by grunt.
@@ -39,43 +39,6 @@ Prerequires:
 
 6. The result will be stored in d:\ioBroker.build\delivery as ioBrokerInstaller.VX.y.z.exe
 
-7. To build .deb, copy the directory d:\ioBroker.build\build\.debian-pi-ready to debian and call
-```
-   #sudo sh redeb.sh
-```
-The file ioBroker-VX.y.z.deb will be created.
-
-
-#Build on Debian:
-1. download and extract to some directory: https://github.com/ioBroker/ioBroker.build/archive/master.zip, e.g. /tmp/ioBroker.build
-```
-   #cd /tmp
-   #wget https://github.com/ioBroker/ioBroker.build/archive/master.zip
-   #unzip master.zip
-```
-
-2. Install grunt-cli:
-```
-   #npm install grunt-cli -g
-```
-
-3. Get npm packages: 
-```
-   #npm install
-```
-
-4. Call grunt. It will take a while:
-```
-   #grunt
-```
-
-5. To build .deb, go the directory build/.debian-pi-ready to debian and call
-```
-   #cd build/.debian-pi-ready
-   #sudo sh redeb.sh
-```
-
-The file `ioBroker-VX.y.z.deb` will be created.
 
 
 
