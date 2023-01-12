@@ -149,52 +149,39 @@ begin
   end;
 end;
 
+function NodeJsPath(Param: String):String;
+begin
+  result := FileSearch('node.exe', GetEnv('PATH'));
+  if (result <> '') then
+  begin
+    result := ExtractFilePath(result);
+    Log(Format('Found Node.js path %s', [result]));
+  end
+    else
+  begin
+    Log( 'Node.js not found in path.');
+  end;
+end;
 function NodeJsNeedsInstall():boolean;
 var
   ResultCode: integer;
+  nodeExePath: string;
 begin
-
   result := true;
-  if IsWin64 then begin
-      result := not FileExists(ExpandConstant('{commonpf64}\nodejs\node.exe'));
-
-      if result then begin
-        result := not FileExists(ExpandConstant('{commonpf32}\nodejs\node.exe'));
-      end;
+  nodeExePath := NodeJsPath('');
+  if (nodeExePath <> '') then
+  nodeExePath := nodeExePath + 'node.exe';
+  begin
+    result := not FileExists(nodeExePath);
+    if not result then begin
+      result := not CheckNodeJs(nodeExePath);
+    end;
   end;
-
-  if result then begin
-    result := not FileExists(ExpandConstant('{commonpf}\nodejs\node.exe'));
-  end;
-
-  if not result then begin
-    result := not CheckNodeJs(ExpandConstant('{commonpf}\nodejs\node.exe'));
-  end;
-
   if not DirExists(ExpandConstant('{userappdata}\npm')) then begin
      Exec(ExpandConstant('mkdir'), ExpandConstant('{userappdata}\npm'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   end;
   if not DirExists(ExpandConstant('{userappdata}\npm-cache')) then begin
      Exec(ExpandConstant('mkdir'), ExpandConstant('{userappdata}\npm-cache'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  end;
-end;
-
-function NodeJsPath(Param: String):String;
-begin
-  result := '';
-
-  if DirExists(ExpandConstant('{commonpf}\nodejs')) then begin
-    result := ExpandConstant('{commonpf}\nodejs');
-  end;
-
-  if IsWin64 then begin
-      if DirExists(ExpandConstant('{commonpf32}\nodejs')) then begin
-        result := ExpandConstant('{commonpf32}\nodejs');
-      end;
-
-      if DirExists(ExpandConstant('{commonpf64}\nodejs')) then begin
-        result := ExpandConstant('{commonpf64}\nodejs');
-      end;
   end;
 end;
 
