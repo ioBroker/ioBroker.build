@@ -36,6 +36,7 @@ ArchitecturesInstallIn64BitMode=x64
 UninstallDisplayIcon={app}\{#MyAppIcon}
 CloseApplications=yes
 MissingRunOnceIdsWarning=no
+ChangesEnvironment=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -151,7 +152,8 @@ end;
 
 function NodeJsPath(Param: String):String;
 begin
-  result := FileSearch('node.exe', GetEnv('PATH'));
+  result := '';
+  RegQueryStringValue(HKEY_LOCAL_MACHINE, 'SOFTWARE\Node.js', 'InstallPath', result);
   if (result <> '') then
   begin
     result := ExtractFilePath(result);
@@ -159,9 +161,10 @@ begin
   end
     else
   begin
-    Log( 'Node.js not found in path.');
+    Log( 'Node.js not found in registry.');
   end;
 end;
+
 function NodeJsNeedsInstall():boolean;
 var
   ResultCode: integer;
@@ -170,8 +173,8 @@ begin
   result := true;
   nodeExePath := NodeJsPath('');
   if (nodeExePath <> '') then
-  nodeExePath := nodeExePath + 'node.exe';
   begin
+    nodeExePath := nodeExePath + 'node.exe';
     result := not FileExists(nodeExePath);
     if not result then begin
       result := not CheckNodeJs(nodeExePath);
