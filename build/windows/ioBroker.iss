@@ -61,6 +61,23 @@ Name: "{group}\Stop {#MyAppShortName} Service"; Filename: "{app}\serviceIoBroker
 Name: "{group}\Restart {#MyAppShortName} Service"; Filename: "{app}\serviceIoBroker.bat"; Parameters: "restart"
 
 [Code]
+function isPortUsed(APort:String):Boolean;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{cmd}'), '/C netstat -na | findstr'+' /C:":' + APort + ' "', '', 0, ewWaitUntilTerminated, ResultCode);
+  Result := ResultCode <> 1;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  Result := not isPortUsed('9000') and not isPortUsed('9001');
+  if not Result then
+    MsgBox('Port 9000 und/oder 9001 werden bereits verwendet!'#13 +
+           'Stellen Sie sicher, dass diese Ports verfügbar sind, bevor Sie ioBroker installieren.'#13#13 +
+           'Die Installation wird abgebrochen!', mbCriticalError, MB_OK);
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: integer;
