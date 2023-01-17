@@ -68,7 +68,7 @@ german.PortsInUseDescription=Die für ioBroker erforderlichen Ports sind nicht v
 english.PortsInUseDescription=The required ports are not available
 russian.PortsInUseDescription=???
 german.PortsInUseMessage=Mindestens einer der für ioBroker benötigten Ports (8081, 9000, 9001) wird aktuell verwendet.%nStellen Sie vor der Installation sicher, dass diese Ports für ioBroker verfügbar sind.%n%nDie Installation kann nicht fortgesetzt werden!
-english.PortsInUseMessage=At least one of the ports used by ioBroker (8081, 9000, 9001) is currently in use.%nPlease make sure that these ports are available before installing ioBroker.%n%nThe installation could not be continued!
+english.PortsInUseMessage=At least one of the ports used by ioBroker (8081, 9000, 9001) is currently in use.%nPlease make sure that these ports are available before installing ioBroker.%n%nThe installation can not be continued!
 russian.PortsInUseMessage=???
 
 [Code]
