@@ -61,7 +61,44 @@ Name: "{group}\Start {#MyAppShortName} Service"; Filename: "{app}\serviceIoBroke
 Name: "{group}\Stop {#MyAppShortName} Service"; Filename: "{app}\serviceIoBroker.bat"; Parameters: "stop"
 Name: "{group}\Restart {#MyAppShortName} Service"; Filename: "{app}\serviceIoBroker.bat"; Parameters: "restart"
 
+[CustomMessages]
+german.PortsInUseCaption=Erforderliche Ports blockiert
+english.PortsInUseCaption=Required ports blocked
+russian.PortsInUseCaptiuon=Требуемые порты заняты
+german.PortsInUseDescription=Die für ioBroker erforderlichen Ports sind nicht verfügbar
+english.PortsInUseDescription=The required ports are not available
+russian.PortsInUseDescription=Требуемые порты недоступны
+german.PortsInUseMessage=Mindestens einer der für ioBroker benötigten Ports (8081, 9000, 9001) wird aktuell verwendet.%nStellen Sie vor der Installation sicher, dass diese Ports für ioBroker verfügbar sind.%n%nDie Installation kann nicht fortgesetzt werden!
+english.PortsInUseMessage=At least one of the ports used by ioBroker (8081, 9000, 9001) is currently in use.%nPlease make sure that these ports are available before installing ioBroker.%n%nThe installation can not be continued!
+russian.PortsInUseMessage=По крайней мере один из портов, используемых ioBroker (8081, 9000, 9001), в настоящее время используется.%nПеред установкой ioBroker убедитесь, что эти порты доступны.%n%nПродолжение установки невозможно!
+
 [Code]
+function isPortUsed(APort:String):Boolean;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{cmd}'), '/C netstat -na | findstr'+' /C:":' + APort + ' "', '', 0, ewWaitUntilTerminated, ResultCode);
+  Result := ResultCode <> 1;
+end;
+
+procedure MessagePageActivate(Sender: TWizardPage);
+begin
+  Wizardform.NextButton.Enabled := False;
+end;
+
+procedure InitializeWizard;
+var
+  OutputMsgWizardPage: TOutputMsgWizardPage;
+  ShowPortsDisabledPage: Boolean;
+begin
+  ShowPortsDisabledPage := isPortUsed('8081') or isPortUsed('9000') or isPortUsed('9001');
+  if ShowPortsDisabledPage then
+  begin
+    OutputMsgWizardPage := CreateOutputMsgPage(wpWelcome, CustomMessage('PortsInUseCaption'), CustomMessage('PortsInUseDescription'), CustomMessage('PortsInUseMessage'));
+    OutputMsgWizardPage.OnActivate := @MessagePageActivate;
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: integer;
