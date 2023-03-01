@@ -4,8 +4,8 @@ Windows installer Build installation packages for ioBroker.
 
 Pre-requires:
 - Node JS with NPM
-- Windows to build .exe and debian to build .deb
-- Internet connection, because the **ioBroker.nodejs** will be downloaded by grunt.
+- Windows to build .exe
+- Internet connection, because the **ioBroker.nodejs** will be downloaded by gulp.
 
 #Build on windows:
 1. download and extract to some directory: https://github.com/ioBroker/ioBroker.build/archive/master.zip, e.g. to *d:\ioBroker.build*
@@ -18,17 +18,12 @@ Pre-requires:
 
 3. Install grunt-cli:
 ```
-   >npm install grunt-cli -g
-```
-
-4. Get npm packages: 
-```
    >npm install
 ```
 
-5. Call grunt. It will take a while:
+5. Call gulp. It will take a while:
 ```
-   >grunt
+   >npm run build
 ```
 
 5. To finish .exe build, go to d:\ioBroker.build\build\.windows-ready and call createSetup.bat 

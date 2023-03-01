@@ -1,12 +1,31 @@
 const gulp = require('gulp');
 const axios = require('axios');
 const fs = require('fs');
-const del = require('del');
 const path = require('path');
 const version = require('./package.json').version;
 
-const nodejsLink86 = 'https://nodejs.org/download/release/v16.15.1/node-v16.15.1-x86.msi';
-const nodejsLink64 = 'https://nodejs.org/download/release/v16.15.1/node-v16.15.1-x64.msi';
+const nodejsLink86 = 'https://nodejs.org/download/release/v16.16.0/node-v16.16.0-x86.msi';
+const nodejsLink64 = 'https://nodejs.org/download/release/v16.16.0/node-v16.16.0-x64.msi';
+
+function deleteFoldersRecursive(path, exceptions) {
+    if (fs.existsSync(path)) {
+        const files = fs.readdirSync(path);
+        for (const file of files) {
+            const curPath = `${path}/${file}`;
+            if (exceptions && exceptions.find(e => curPath.endsWith(e))) {
+                continue;
+            }
+
+            const stat = fs.statSync(curPath);
+            if (stat.isDirectory()) {
+                deleteFoldersRecursive(curPath);
+                fs.rmdirSync(curPath);
+            } else {
+                fs.unlinkSync(curPath);
+            }
+        }
+    }
+}
 
 function download(url, file) {
     const directoryName = path.dirname(file);
@@ -18,7 +37,12 @@ function download(url, file) {
         .then(response => fs.writeFileSync(file, response.data));
 }
 
-gulp.task('0-clean', () => del(['tmp/**/*', 'build/.windows-ready/**/*', 'delivery/**/*']));
+gulp.task('0-clean', done => {
+    deleteFoldersRecursive(`${__dirname}/tmp`);
+    deleteFoldersRecursive(`${__dirname}/build/.windows-ready`);
+    deleteFoldersRecursive(`${__dirname}/delivery`);
+    done();
+});
 gulp.task('1-nodex86', () => download(nodejsLink86, `${__dirname}/build/windows/nodejs/node.msi`));
 gulp.task('2-nodex64', () => download(nodejsLink64, `${__dirname}/build/windows/nodejs/node-x64.msi`));
 gulp.task('3-0-replaceWindowsVersion', async () => {
