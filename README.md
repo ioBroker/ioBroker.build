@@ -21,7 +21,7 @@ Pre-requires:
    >npm install
 ```
 
-5. Call gulp. It will take a while:
+4. Call gulp. It will take a while:
 ```
    >npm run build
 ```

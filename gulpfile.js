@@ -137,7 +137,7 @@ function signExe() {
             .then(() => {
                 // Install node modules
                 if (process.env.CERT_FILE) {
-                    fs.writeFileSync(__dirname + '/ioBrokerCodeSigningCertificate.pfx', Buffer.from(process.env.CERT_FILE, 'base64'));
+                    fs.writeFileSync(`${__dirname}/ioBrokerCodeSigningCertificate.pfx`, Buffer.from(process.env.CERT_FILE, 'base64'));
                     console.log(`Saved ${Buffer.from(process.env.CERT_FILE, 'base64').length} bytes in certificate`);
                 } else if (fs.existsSync(`${__dirname}/ioBrokerCodeSigningCertificate.pfx`) && !fs.existsSync(`${__dirname}/ioBrokerCodeSigningCertificate.base64.txt`)) {
                     fs.writeFileSync(`${__dirname}/ioBrokerCodeSigningCertificate.base64.txt`, fs.readFileSync(`${__dirname}/ioBrokerCodeSigningCertificate.pfx`).toString('base64'));
