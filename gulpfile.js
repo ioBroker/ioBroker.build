@@ -4,9 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const version = require('./package.json').version;
 
-const nodejsLink86 = 'https://nodejs.org/download/release/v16.16.0/node-v16.16.0-x86.msi';
-const nodejsLink64 = 'https://nodejs.org/download/release/v16.16.0/node-v16.16.0-x64.msi';
-
 function deleteFoldersRecursive(path, exceptions) {
     if (fs.existsSync(path)) {
         const files = fs.readdirSync(path);
@@ -43,15 +40,13 @@ gulp.task('0-clean', done => {
     deleteFoldersRecursive(`${__dirname}/delivery`);
     done();
 });
-gulp.task('1-nodex86', () => download(nodejsLink86, `${__dirname}/build/windows/nodejs/node.msi`));
-gulp.task('2-nodex64', () => download(nodejsLink64, `${__dirname}/build/windows/nodejs/node-x64.msi`));
 gulp.task('3-0-replaceWindowsVersion', async () => {
-    await checkFiles(['build/windows/nodejs/node.msi', 'build/windows/nodejs/node-x64.msi']);
 
     !fs.existsSync(`${__dirname}/build/.windows-ready`) && fs.mkdirSync(`${__dirname}/build/.windows-ready`);
 
     let iss = fs.readFileSync(`${__dirname}/build/windows/ioBroker.iss`).toString('utf8');
     iss = iss.replace('@@version', version)
+    
     fs.writeFileSync(`${__dirname}/build/.windows-ready/ioBroker.iss`, iss);
 
     fs.writeFileSync(`${__dirname}/build/.windows-ready/createSetup.bat`, `"${__dirname}/build/windows/InnoSetup6/ISCC.exe" "${__dirname}/build/.windows-ready/ioBroker.iss"`);
@@ -60,8 +55,6 @@ gulp.task('3-0-replaceWindowsVersion', async () => {
 gulp.task('3-1-copy', async () =>
     gulp.src([
         'build/windows/*.js',
-        'build/windows/*.ico',
-        'build/windows/*.bat',
         'build/windows/*.json',
         '!service_ioBroker.bat',
         '!_service_ioBroker.bat',
@@ -69,11 +62,17 @@ gulp.task('3-1-copy', async () =>
     ])
         .pipe(gulp.dest('build/.windows-ready')));
 
-gulp.task('3-2-copy-nodejs', async () =>
+gulp.task('3-1-copy-res', async () =>
     gulp.src([
-        'build/windows/nodejs/**/*',
+        'build/windows/resource/*',
     ])
-        .pipe(gulp.dest('build/.windows-ready/nodejs')));
+        .pipe(gulp.dest('build/.windows-ready/resource')));
+
+gulp.task('3-1-copy-lang', async () =>
+    gulp.src([
+        'build/windows/language/*',
+    ])
+        .pipe(gulp.dest('build/.windows-ready/language')));
 
 function _checkFiles(files, callback, index) {
     index = index || 0;
@@ -97,9 +96,7 @@ function runMSI() {
     return new Promise((resolve, reject) => {
         checkFiles([
             'build/.windows-ready/ioBroker.iss',
-            'build/.windows-ready/nodejs/node.msi',
-            'build/.windows-ready/nodejs/node-x64.msi',
-            'build/.windows-ready/ioBroker.ico'
+            'build/.windows-ready/resource/ioBroker.ico'
         ])
             .then(() => {
                 // Install node modules
@@ -198,9 +195,9 @@ gulp.task('3-4-rename', async () => {
 gulp.task('3-5-signExe-manually', signExe);
 
 if (/^win/.test(process.platform)) {
-    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-2-copy-nodejs', '3-3-runMSI', '3-4-rename']));
+    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-1-copy-res', '3-1-copy-lang', '3-3-runMSI', '3-4-rename']));
 } else {
     gulp.task('3-windows-msi', async () => console.warn('Cannot create windows setup, while host is not windows'));
 }
 
-gulp.task('default',  gulp.series(['0-clean', '1-nodex86', '2-nodex64', '3-windows-msi']));
+gulp.task('default',  gulp.series(['0-clean', '3-windows-msi']));

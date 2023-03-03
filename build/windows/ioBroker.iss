@@ -27,20 +27,21 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
-DefaultDirName=c:\ioBroker
+DefaultDirName={drive:{commonpf}}\ioBroker
 DefaultGroupName={#MyAppName}
+OutputDir=..\..\delivery
 LicenseFile=resource\Lizenz.txt
-; Uncomment the following line to run in non administrative install mode (install for current user only.)
-;PrivilegesRequired=lowest
-OutputBaseFilename=ioBrokerInstaller
-SetupIconFile=resource\ioBroker.ico
+OutputBaseFilename={#MyAppShortName}Installer.{#MyAppVersion}
+SetupIconFile=resource\{#MyAppIcon}
 Compression=lzma
 SolidCompression=yes
 DisableWelcomePage=No
 WizardStyle=modern
 WizardImageFile=resource\ioBroker.bmp
 UninstallDisplayIcon={uninstallexe}
-MissingRunOnceIdsWarning=No
+CloseApplications=yes
+MissingRunOnceIdsWarning=no
+ChangesEnvironment=yes
 
 [Icons]
 Name: "{group}\Uninstall {#MyAppShortName}"; Filename: "{uninstallexe}"; IconFilename: {app}\{#MyAppIcon};
