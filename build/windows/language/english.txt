@@ -1,6 +1,6 @@
-english.Intro=ioBroker is a central server for smart homes, building automation and active assisted living.%n%nWith ioBroker you get:%n- a powerful but easy to manage IOT solution%n- a user friendly interface%n- easy integration with existing systems and services%n- modular design%n- web-based visualizations%n- mobile access%n- connectivity with Alexa, Homekit and many other smart home systems - help from a large and active community%n%nioBroker - Automate your life%n%nInstaller Version {#MyAppVersion}
+﻿english.Intro=ioBroker is a central server for smart homes, building automation and active assisted living.%n%nWith ioBroker you get:%n- a powerful but easy to manage IOT solution%n- a user friendly interface%n- easy integration with existing systems and services%n- modular design%n- web-based visualizations%n- mobile access%n- connectivity with Alexa, Homekit and many other smart home systems - help from a large and active community%n%nioBroker - Automate your life%n%nInstaller Version {#MyAppVersion}
 english.PortInUse=Port %s already in use by process "%s", PID %s
-english.PortAvailable=Port %d ist vrf�gbar
+english.PortAvailable=Port %d ist vrfügbar
 english.IoBrokerInstalled=ioBroker version %d.%d.%d installed in %s
 english.IoBrokerNotInstalled=ioBroker not installed in %s
 english.NodeInstalled=Node.js version %d.%d.%d installed in %s
