@@ -13,10 +13,11 @@
 #define MyAppName "ioBroker automation platform"  
 #define MyAppShortName "ioBroker"
 #define MyAppLCShortName "iobroker"
-#define MyAppVersion "@@version"
 #define MyAppPublisher "ioBroker GmbH"
 #define MyAppURL "https://www.ioBroker.net/"
 #define MyAppIcon "ioBroker.ico"
+
+#include "..\.windows-ready\version.txt"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
@@ -58,11 +59,11 @@ Name: "dutch"; MessagesFile: "compiler:Languages\Dutch.isl"
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 Name: "german"; MessagesFile: "compiler:Languages\German.isl"
 Name: "italian"; MessagesFile: "compiler:Languages\Italian.isl"
-;Name: "polish"; MessagesFile: "compiler:Languages\Polish.isl"
+Name: "polish"; MessagesFile: "compiler:Languages\Polish.isl"
 Name: "portuguese"; MessagesFile: "compiler:Languages\Portuguese.isl"
-;Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
+Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
-;Name: "ukrainian"; MessagesFile: "compiler:Languages\Ukrainian.isl"
+Name: "ukrainian"; MessagesFile: "compiler:Languages\Ukrainian.isl"
 
 [CustomMessages]
 #include "language\english.txt"
@@ -70,11 +71,11 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 #include "language\french.txt"
 #include "language\german.txt"
 #include "language\italian.txt"
-;#include "language\polish.txt"
+#include "language\polish.txt"
 #include "language\portuguese.txt"
-;#include "language\russian.txt"
+#include "language\russian.txt"
 #include "language\spanish.txt"
-;#include "language\ukrainian.txt"
+#include "language\ukrainian.txt"
 
 //russian.Intro=ioBroker - это центральный сервер для умных домов и автоматизации.%n%nCioBroker вы получаете:%n- мощное, но простое в управлении решение от%n- удобный интерфейс%n- простая интеграция с существующими системами и службами%n- модульный дизайн%n- визуализация через Интернет%n- мобильный доступ%n- подключение к Alexa, Homekit многим другим системам умного дома%n- помощь от большого и активного сообщества%n%nioBroker - Automate your life%n%nInstaller Version {#MyAppVersion}
 

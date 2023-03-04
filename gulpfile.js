@@ -44,10 +44,7 @@ gulp.task('3-0-replaceWindowsVersion', async () => {
 
     !fs.existsSync(`${__dirname}/build/.windows-ready`) && fs.mkdirSync(`${__dirname}/build/.windows-ready`);
 
-    let iss = fs.readFileSync(`${__dirname}/build/windows/ioBroker.iss`).toString('utf8');
-    iss = iss.replace('@@version', version)
-    
-    fs.writeFileSync(`${__dirname}/build/.windows-ready/ioBroker.iss`, iss);
+    fs.writeFileSync(`${__dirname}/build/.windows-ready/version.txt`, `#define MyAppVersion "${version}"`);
 
     fs.writeFileSync(`${__dirname}/build/.windows-ready/createSetup.bat`, `"${__dirname}/build/windows/InnoSetup6/ISCC.exe" "${__dirname}/build/.windows-ready/ioBroker.iss"`);
 });
@@ -56,21 +53,21 @@ gulp.task('3-1-copy', async () =>
     gulp.src([
         'build/windows/*.js',
         'build/windows/*.json',
+        'build/windows/*.iss',
         '!service_ioBroker.bat',
-        '!_service_ioBroker.bat',
-        '!*.iss'
+        '!_service_ioBroker.bat'
     ])
         .pipe(gulp.dest('build/.windows-ready')));
 
 gulp.task('3-1-copy-res', async () =>
     gulp.src([
-        'build/windows/resource/*',
+        'build/windows/resource/*'
     ])
         .pipe(gulp.dest('build/.windows-ready/resource')));
 
 gulp.task('3-1-copy-lang', async () =>
     gulp.src([
-        'build/windows/language/*',
+        'build/windows/language/*'
     ])
         .pipe(gulp.dest('build/.windows-ready/language')));
 
@@ -102,7 +99,7 @@ function runMSI() {
                 // Install node modules
                 const cwd = __dirname.replace(/\\/g, '/') + '/build/windows/';
 
-                const cmd = `"${__dirname}\\build\\windows\\InnoSetup6\\ISCC.exe" "${__dirname}\\build\\.windows-ready\\ioBroker.iss"`;
+                const cmd = `"${__dirname}\\build\\windows\\InnoSetup6\\ISCC.exe" "${__dirname}\\build\\windows\\ioBroker.iss"`;
                 console.log(`"${cmd} in ${cwd}`);
 
                 // System call used for update of js-controller itself,
