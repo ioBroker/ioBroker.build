@@ -2,7 +2,7 @@
 ; - ioBroker Windows Installer                                                                 -
 ; ----------------------------------------------------------------------------------------------
 ; -                                                                                            -
-; - 21.05.2023 Bluefox: Initial version                                                        -
+; - 21.05.2022 Bluefox: Initial version                                                        -
 ; - 03.03.2023 Gaspode: Improved look & feel, improved error handling, added several checks,   -
 ; -                     implemented more options                                               -
 ; - 04.03.2023 Gaspode: added several languages                                                -
@@ -10,7 +10,7 @@
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 
-#define MyAppName "ioBroker automation platform"  
+#define MyAppName "ioBroker automation platform"
 #define MyAppShortName "ioBroker"
 #define MyAppLCShortName "iobroker"
 #define MyAppPublisher "ioBroker GmbH"
@@ -155,7 +155,7 @@ var
   installIoBrokerLabel: TLabel;
   fixIoBrokerCB: TCheckBox;
   fixIoBrokerLabel: TLabel;
-  
+
   additionalHintsLabel: TLabel;
 
   retryButton: TButton;
@@ -170,7 +170,7 @@ var
   iobInstalled: Boolean;
 
   isUpgrade: Boolean;
-  
+
   installationSuccessful: Boolean;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -407,7 +407,7 @@ begin
   nodeJsEx := nodePath + '\node.exe';
   if (FileExists(ioBrokerEx)) then begin
     // The following code is not optimal, because sometimes "iob status" answers "running"
-    // Even if the service has been stopped more than a minute ago. 
+    // Even if the service has been stopped more than a minute ago.
     {
     if (nodePath <> '') then begin
       statusString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" status', False);
@@ -594,7 +594,7 @@ begin
 
   progressPage.SetProgress(progress, maxProgress); progress := progress +1;
   progressPage.SetText(CustomMessage('GatherInformation'), CustomMessage('RequiredPorts'));
-  
+
   ExtractTemporaryFiles('{tmp}\port.bat');
 
   if instNodeVersionMajor = 0 then begin
@@ -653,7 +653,7 @@ begin
     info1IoBrokerRunLabel.Caption := '✓';
     info2IoBrokerRunLabel.Caption := CustomMessage('IoBrokerNotRunning');
   end;
-  
+
   portInfo := getPortInfo(9000);
   if portinfo <> '' then begin
     explode(portInfoArray, portInfo, ';');
@@ -669,7 +669,7 @@ begin
     info2Port9000Label.Caption := Format(CustomMessage('PortAvailable'), [9000]);
   end;
   progressPage.SetProgress(progress, maxProgress); progress := progress +1;
-  
+
   portInfo := getPortInfo(9001);
   if portInfo <> '' then begin
     explode(portInfoArray, portInfo, ';');
@@ -685,7 +685,7 @@ begin
     info2Port9001Label.Caption := Format(CustomMessage('PortAvailable'), [9001]);
   end;
   progressPage.SetProgress(progress, maxProgress); progress := progress +1;
-  
+
   portInfo := getPortInfo(8081);
   if portInfo <> '' then begin
     explode(portInfoArray, portInfo, ';');
@@ -817,7 +817,7 @@ begin
     fixIoBrokerCB.Enabled := True;
   end;
 end;
- 
+
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 procedure updateNextOptionPage(sender: TObject);
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -847,7 +847,7 @@ begin
     info1NodeLabel.Parent := summaryPage.Surface;
     info1NodeLabel.Left := ScaleX(8);
     info1NodeLabel.Top := ScaleY(2);
-    info1NodeLabel.Width := ScaleX(12); 
+    info1NodeLabel.Width := ScaleX(12);
     info1NodeLabel.Height := ScaleX(12);
     info1NodeLabel.Font.Style := [fsBold];
 
@@ -855,14 +855,14 @@ begin
     info2NodeLabel.Parent := summaryPage.Surface;
     info2NodeLabel.Left := ScaleX(22);
     info2NodeLabel.Top := ScaleY(2);
-    info2NodeLabel.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    info2NodeLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
     info2NodeLabel.Height := ScaleY(16);
 
     info3NodeLabel := TLabel.Create(WizardForm);
     info3NodeLabel.Parent := summaryPage.Surface;
     info3NodeLabel.Left := ScaleX(22);
     info3NodeLabel.Top := info1NodeLabel.Top + info1NodeLabel.Height + ScaleY(4);
-    info3NodeLabel.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    info3NodeLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
     info3NodeLabel.Height := ScaleY(16);
 
 
@@ -873,12 +873,12 @@ begin
     info1IoBrokerLabel.Width := ScaleX(12);
     info1IoBrokerLabel.Height := ScaleY(12);
     info1IoBrokerLabel.Font.Style := [fsBold];
-    
+
     info2IoBrokerLabel := TLabel.Create(WizardForm);
     info2IoBrokerLabel.Parent := summaryPage.Surface;
     info2IoBrokerLabel.Left := ScaleX(22);
     info2IoBrokerLabel.Top := info3NodeLabel.Top + info1NodeLabel.Height + ScaleY(12);
-    info2IoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    info2IoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
     info2IoBrokerLabel.Height := ScaleY(12);
 
 
@@ -889,15 +889,15 @@ begin
     info1IoBrokerRunLabel.Width := ScaleX(12);
     info1IoBrokerRunLabel.Height := ScaleY(12);
     info1IoBrokerRunLabel.Font.Style := [fsBold];
-    
+
     info2IoBrokerRunLabel := TLabel.Create(WizardForm);
     info2IoBrokerRunLabel.Parent := summaryPage.Surface;
     info2IoBrokerRunLabel.Left := ScaleX(22);
     info2IoBrokerRunLabel.Top := info1IoBrokerLabel.Top + info1IoBrokerLabel.Height + ScaleY(4);
-    info2IoBrokerRunLabel.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    info2IoBrokerRunLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
     info2IoBrokerRunLabel.Height := ScaleY(12);
 
-    
+
     info1Port9000Label := TLabel.Create(WizardForm);
     info1Port9000Label.Parent := summaryPage.Surface;
     info1Port9000Label.Left := ScaleX(8);
@@ -905,15 +905,15 @@ begin
     info1Port9000Label.Width := ScaleX(12);
     info1Port9000Label.Height := ScaleY(12);
     info1Port9000Label.Font.Style := [fsBold];
-    
+
     info2Port9000Label := TLabel.Create(WizardForm);
     info2Port9000Label.Parent := summaryPage.Surface;
     info2Port9000Label.Left := ScaleX(22);
     info2Port9000Label.Top := info2IoBrokerRunLabel.Top + info2IoBrokerRunLabel.Height + ScaleY(12);
-    info2Port9000Label.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    info2Port9000Label.Width := summaryPage.SurfaceWidth - ScaleX(22);
     info2Port9000Label.Height := ScaleY(12);
 
-    
+
     info1Port9001Label := TLabel.Create(WizardForm);
     info1Port9001Label.Parent := summaryPage.Surface;
     info1Port9001Label.Left := ScaleX(8);
@@ -921,15 +921,15 @@ begin
     info1Port9001Label.Width := ScaleX(12);
     info1Port9001Label.Height := ScaleY(12);
     info1Port9001Label.Font.Style := [fsBold];
-    
+
     info2Port9001Label := TLabel.Create(WizardForm);
     info2Port9001Label.Parent := summaryPage.Surface;
     info2Port9001Label.Left := ScaleX(22);
     info2Port9001Label.Top := info1Port9000Label.Top + info1Port9000Label.Height + ScaleY(4);
-    info2Port9001Label.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    info2Port9001Label.Width := summaryPage.SurfaceWidth - ScaleX(22);
     info2Port9001Label.Height := ScaleY(12);
 
-    
+
     info1Port8081Label := TLabel.Create(WizardForm);
     info1Port8081Label.Parent := summaryPage.Surface;
     info1Port8081Label.Left := ScaleX(8);
@@ -937,24 +937,24 @@ begin
     info1Port8081Label.Width := ScaleX(12);
     info1Port8081Label.Height := ScaleY(12);
     info1Port8081Label.Font.Style := [fsBold];
-    
+
     info2Port8081Label := TLabel.Create(WizardForm);
     info2Port8081Label.Parent := summaryPage.Surface;
     info2Port8081Label.Left := ScaleX(22);
     info2Port8081Label.Top := info1Port9001Label.Top + info1Port9001Label.Height + ScaleY(4);
-    info2Port8081Label.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    info2Port8081Label.Width := summaryPage.SurfaceWidth - ScaleX(22);
     info2Port8081Label.Height := ScaleY(12);
 
     summaryLabel := TLabel.Create(WizardForm);
-    summaryLabel.Parent := summaryPage.Surface; 
+    summaryLabel.Parent := summaryPage.Surface;
     summaryLabel.Top := info1Port8081Label.Top + info1Port8081Label.Height + ScaleY(10);
-    summaryLabel.Width := summaryPage.SurfaceWidth - ScaleX(4); 
+    summaryLabel.Width := summaryPage.SurfaceWidth - ScaleX(4);
     summaryLabel.Height := ScaleY(80);
     summaryLabel.AutoSize := False;
     summaryLabel.Wordwrap := True;
 
     retryButton := TButton.Create(WizardForm);
-    retryButton.Parent := summaryPage.Surface; 
+    retryButton.Parent := summaryPage.Surface;
     retryButton.Top := summaryLabel.Top + summaryLabel.Height + ScaleY(4);
     retryButton.Width := ScaleX(100);
     retryButton.Height := ScaleY(30);
@@ -966,7 +966,7 @@ begin
     installNodeCB.Parent := optionsPage.Surface;
     installNodeCB.Left := ScaleX(8);
     installNodeCB.Top := ScaleY(2);
-    installNodeCB.Width := ScaleX(12); 
+    installNodeCB.Width := ScaleX(12);
     installNodeCB.Height := ScaleX(12);
     installNodeCB.OnClick := @updateNextOptionPage;
 
@@ -974,14 +974,14 @@ begin
     installNodeLabel.Parent := optionsPage.Surface;
     installNodeLabel.Left := ScaleX(28);
     installNodeLabel.Top := ScaleY(2);
-    installNodeLabel.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    installNodeLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
     installNodeLabel.Height := ScaleY(16);
 
     installIoBrokerCB := TCheckBox.Create(WizardForm);
     installIoBrokerCB.Parent := optionsPage.Surface;
     installIoBrokerCB.Left := ScaleX(8);
     installIoBrokerCB.Top := installNodeCB.Top + installNodeCB.Height + ScaleY(10);
-    installIoBrokerCB.Width := ScaleX(12); 
+    installIoBrokerCB.Width := ScaleX(12);
     installIoBrokerCB.Height := ScaleX(12);
     installIoBrokerCB.OnClick := @updateNextOptionPage;
 
@@ -989,14 +989,14 @@ begin
     installIoBrokerLabel.Parent := optionsPage.Surface;
     installIoBrokerLabel.Left := ScaleX(28);
     installIoBrokerLabel.Top := installNodeCB.Top + installNodeCB.Height + ScaleY(10);
-    installIoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    installIoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
     installIoBrokerLabel.Height := ScaleY(16);
 
     fixIoBrokerCB := TCheckBox.Create(WizardForm);
     fixIoBrokerCB.Parent := optionsPage.Surface;
     fixIoBrokerCB.Left := ScaleX(8);
     fixIoBrokerCB.Top := installIoBrokerLabel.Top + installIoBrokerLabel.Height + ScaleY(10);
-    fixIoBrokerCB.Width := ScaleX(12); 
+    fixIoBrokerCB.Width := ScaleX(12);
     fixIoBrokerCB.Height := ScaleX(12);
     fixIoBrokerCB.OnClick := @updateNextOptionPage;
 
@@ -1004,13 +1004,13 @@ begin
     fixIoBrokerLabel.Parent := optionsPage.Surface;
     fixIoBrokerLabel.Left := ScaleX(28);
     fixIoBrokerLabel.Top := installIoBrokerLabel.Top + installIoBrokerLabel.Height + ScaleY(10);
-    fixIoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22); 
+    fixIoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
     fixIoBrokerLabel.Height := ScaleY(16);
 
     additionalHintsLabel := TLabel.Create(WizardForm);
-    additionalHintsLabel.Parent := optionsPage.Surface; 
+    additionalHintsLabel.Parent := optionsPage.Surface;
     additionalHintsLabel.Top := fixIoBrokerCB.Top + fixIoBrokerCB.Height + ScaleY(10);
-    additionalHintsLabel.Width := summaryPage.SurfaceWidth - ScaleX(4); 
+    additionalHintsLabel.Width := summaryPage.SurfaceWidth - ScaleX(4);
     additionalHintsLabel.Height := ScaleY(80);
     additionalHintsLabel.AutoSize := False;
     additionalHintsLabel.Wordwrap := True;
@@ -1022,7 +1022,7 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
-  
+
   if (CurPageID = wpSelectDir) or ((CurPageID = wpWelcome) and isUpgrade) then begin
 
     iobServiceName := 'iobroker.exe';
@@ -1359,7 +1359,7 @@ begin
   else begin
     Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepNodeJS'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch]);
   end;
-  
+
   if iobServiceExists then begin
     if iobInstalled = False then begin
       if installIoBrokerCB.checked then begin
@@ -1408,13 +1408,13 @@ begin
     end;
   end;
 
-  if (PageID = wpPassword) or 
-     (PageID = wpInfoBefore) or 
-     (PageID = wpUserInfo) or 
-     (PageID = wpSelectComponents) or 
-     (PageID = wpSelectProgramGroup) or 
-     (PageID = wpSelectTasks) or 
-     (PageID = wpPreparing) or 
+  if (PageID = wpPassword) or
+     (PageID = wpInfoBefore) or
+     (PageID = wpUserInfo) or
+     (PageID = wpSelectComponents) or
+     (PageID = wpSelectProgramGroup) or
+     (PageID = wpSelectTasks) or
+     (PageID = wpPreparing) or
      (PageID = wpInstalling)
   then begin
     Result := true;
@@ -1446,7 +1446,7 @@ begin
 
   appRegKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + appId + '_is1';
   log(appRegKey);
-   
+
   if RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{97DA02F5-2E8C-4B96-BB42-61ED2BBF34DF}_is1' ) then begin
     RegQueryStringValue(HKEY_LOCAL_MACHINE, appRegKey, 'Inno Setup: App Path', appInstPath);
     isUpgrade := True;

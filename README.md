@@ -35,5 +35,11 @@ Pre-requires:
 6. The result will be stored in d:\ioBroker.build\delivery as ioBrokerInstaller.VX.y.z.exe
 
 
+## Changelog
+# 2.0.0 (04.03.2023)
+* (Gaspode) Improved look & feel, improved error handling, added several checks, implemented more options
+* (Gaspode) added several languages
 
+# 1.1.0 (21.05.2022)
+* (bluefox) Initial release 
 
