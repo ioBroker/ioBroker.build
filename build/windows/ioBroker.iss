@@ -5,7 +5,9 @@
 ; - 21.05.2022 Bluefox: Initial version                                                        -
 ; - 03.03.2023 Gaspode: Improved look & feel, improved error handling, added several checks,   -
 ; -                     implemented more options                                               -
-; - 04.03.2023 Gaspode: added several languages                                                -
+; - 04.03.2023 Gaspode: Added several languages                                                -
+; - 07.03.2023 Gaspode: Ensure that node path is set correctly when calling npx                -
+; - 08.03.2023 Gaspode: Implemented option to modify Windows firewall                          -
 ; -                                                                                            -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
@@ -77,8 +79,6 @@ Name: "ukrainian"; MessagesFile: "compiler:Languages\Ukrainian.isl"
 #include "language\spanish.txt"
 #include "language\ukrainian.txt"
 
-//russian.Intro=ioBroker - это центральный сервер для умных домов и автоматизации.%n%nCioBroker вы получаете:%n- мощное, но простое в управлении решение от%n- удобный интерфейс%n- простая интеграция с существующими системами и службами%n- модульный дизайн%n- визуализация через Интернет%n- мобильный доступ%n- подключение к Alexa, Homekit многим другим системам умного дома%n- помощь от большого и активного сообщества%n%nioBroker - Automate your life%n%nInstaller Version {#MyAppVersion}
-
 [Run]
 Filename: http://localhost:8081/; Description: "{cm:OpenIoBrokerSettings}"; Flags: postinstall shellexec;  Check: success
 Filename: {win}\explorer; Parameters: "{app}\log";Description: "{cm:OpenLogFileDirectory}"; Flags: postinstall shellexec;  Check: not success
@@ -86,6 +86,8 @@ Filename: {win}\explorer; Parameters: "{app}\log";Description: "{cm:OpenLogFileD
 [UninstallRun]
 ; Removes System Service
 Filename: "{code:getNodePath}\node.exe"; Parameters: """{app}\uninstall.js"""; Flags: runhidden;
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule ""Node for ioBroker (inbound)"""; Flags: runhidden;
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule ""Node for ioBroker (outbound)"""; Flags: runhidden;
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\*.js"
@@ -155,6 +157,8 @@ var
   installIoBrokerLabel: TLabel;
   fixIoBrokerCB: TCheckBox;
   fixIoBrokerLabel: TLabel;
+  addFirewallRuleCB: TCheckBox;
+  addFirewallRuleLabel: TLabel;
 
   additionalHintsLabel: TLabel;
 
@@ -328,7 +332,7 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function execAndStoreOutput(myCmd: String; myLogFileName: String) : Boolean;
+function execAndStoreOutput(myCmd: String; myLogFileName: String; addPath: String) : Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   tmpBatFileName: String;
@@ -345,8 +349,14 @@ begin
     logPart := '';
   end;
 
+  if addPath <> '' then begin
+    myCmd := '@echo off' + chr(13) + chr(10) + 'SET PATH=' + addPath + ';%PATH%' + chr(13) + chr(10) + myCmd;
+  end
+  else begin
+    myCmd := '@echo off' + chr(13) + chr(10) + myCmd;
+  end;
 
-  if (SaveStringToFile(tmpBatFileName, '@' + myCmd + logPart, false)) then begin
+  if (SaveStringToFile(tmpBatFileName, myCmd + logPart, false)) then begin
     Sleep(1000);
     if (Exec(ExpandConstant('{cmd}'), '/C ' + tmpBatFileName + logPart, appInstPath, SW_HIDE, ewWaitUntilTerminated, resultCode)) then begin
       Result := True;
@@ -446,6 +456,7 @@ begin
         Log(Format('Found Node.js path: %s', [nodePath]));
         RegQueryStringValue(GetHKLM, 'SOFTWARE\Node.js', 'Version', versionString);
         if (nodePath <> '') then begin
+          Log('NodePath: ' + nodePath);
           if (convertVersion(versionString, instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch)) then begin
             Log(Format('Found Node version: %d, %d, %d', [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch]));
             found := true;
@@ -770,7 +781,7 @@ begin
       installNodeCB.Enabled := False;
       additionalHintsLabel.Caption := CustomMessage('NodejsMajorTooHigh');
     end
-    else
+    else begin
       if isNodeVersionSupported(instNodeVersionMajor) = False then begin
         installNodeCB.checked := True;
         installNodeLabel.Caption := Format(CustomMessage('InstallNodejsMajorTooLow'),[instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
@@ -792,13 +803,14 @@ begin
           installNodeCB.Enabled := True;
         end
       end
+    end;
   end;
 
   if (iobVersionMajor = 0) and (iobControllerFoundNoNode = False) then begin
     installIoBrokerCB.checked := True;
     installIoBrokerLabel.Caption := Format(CustomMessage('InstallIoBroker'),[appInstPath]);
-    installIoBrokerCB.Enabled := True;
-    installIoBrokerCB.Enabled := True;
+    installIoBrokerCB.Enabled := False;
+    installIoBrokerCB.Enabled := False;
 
     fixIoBrokerCB.checked := False;
     fixIoBrokerLabel.Caption := Format(CustomMessage('FixIoBroker'),[appInstPath]);
@@ -816,6 +828,9 @@ begin
     fixIoBrokerCB.Enabled := True;
     fixIoBrokerCB.Enabled := True;
   end;
+
+  addFirewallRuleCB.checked := installIoBrokerCB.checked;
+  addFirewallRuleLabel.Caption := CustomMessage('AdaptFirewallRule');
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -823,8 +838,8 @@ procedure updateNextOptionPage(sender: TObject);
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   WizardForm.NextButton.Enabled := True;
-  if (installNodeCB <> nil) and (installNodeCB <> nil) and (installNodeCB <> nil) then begin
-    WizardForm.NextButton.Enabled := (installNodeCB.Checked or installIoBrokerCB.Checked or fixIoBrokerCB.Checked);
+  if (installNodeCB <> nil) and (installNodeCB <> nil) and (installNodeCB <> nil) and (addFirewallRuleCB <> nil) then begin
+    WizardForm.NextButton.Enabled := (installNodeCB.Checked or installIoBrokerCB.Checked or fixIoBrokerCB.Checked or addFirewallRuleCB.Checked);
   end;
   WizardForm.Update;
 end;
@@ -995,7 +1010,7 @@ begin
     fixIoBrokerCB := TCheckBox.Create(WizardForm);
     fixIoBrokerCB.Parent := optionsPage.Surface;
     fixIoBrokerCB.Left := ScaleX(8);
-    fixIoBrokerCB.Top := installIoBrokerLabel.Top + installIoBrokerLabel.Height + ScaleY(10);
+    fixIoBrokerCB.Top := installIoBrokerCB.Top + installIoBrokerCB.Height + ScaleY(10);
     fixIoBrokerCB.Width := ScaleX(12);
     fixIoBrokerCB.Height := ScaleX(12);
     fixIoBrokerCB.OnClick := @updateNextOptionPage;
@@ -1003,13 +1018,26 @@ begin
     fixIoBrokerLabel := TLabel.Create(WizardForm);
     fixIoBrokerLabel.Parent := optionsPage.Surface;
     fixIoBrokerLabel.Left := ScaleX(28);
-    fixIoBrokerLabel.Top := installIoBrokerLabel.Top + installIoBrokerLabel.Height + ScaleY(10);
+    fixIoBrokerLabel.Top := installIoBrokerCB.Top + installIoBrokerCB.Height + ScaleY(10);
     fixIoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
     fixIoBrokerLabel.Height := ScaleY(16);
 
+    addFirewallRuleCB := TCheckBox.Create(WizardForm);
+    addFirewallRuleCB.Parent := optionsPage.Surface;
+    addFirewallRuleCB.Left := ScaleX(8);
+    addFirewallRuleCB.Top := fixIoBrokerCB.Top + fixIoBrokerCB.Height + ScaleY(10);
+    addFirewallRuleCB.Width := ScaleX(12); 
+    addFirewallRuleCB.Height := ScaleX(12);
+    addFirewallRuleCB.OnClick := @updateNextOptionPage;
+    addFirewallRuleLabel := TLabel.Create(WizardForm);
+    addFirewallRuleLabel.Parent := optionsPage.Surface;
+    addFirewallRuleLabel.Left := ScaleX(28);
+    addFirewallRuleLabel.Top := fixIoBrokerCB.Top + fixIoBrokerCB.Height + ScaleY(10);
+    addFirewallRuleLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
+    addFirewallRuleLabel.Height := ScaleY(16);
     additionalHintsLabel := TLabel.Create(WizardForm);
     additionalHintsLabel.Parent := optionsPage.Surface;
-    additionalHintsLabel.Top := fixIoBrokerCB.Top + fixIoBrokerCB.Height + ScaleY(10);
+    additionalHintsLabel.Top := addFirewallRuleCB.Top + addFirewallRuleCB.Height + ScaleY(10);
     additionalHintsLabel.Width := summaryPage.SurfaceWidth - ScaleX(4);
     additionalHintsLabel.Height := ScaleY(80);
     additionalHintsLabel.AutoSize := False;
@@ -1050,7 +1078,7 @@ var
 begin
   if tryStopServiceAtNextRetry then begin
     progressPage.SetProgress(0,5);
-    progressPage.SetText('ioBroker - Automate your life', CustomMessage('TryStopIoB'));
+    progressPage.SetText('', CustomMessage('TryStopIoB'));
     progressPage.Show;
     output := execAndReturnOutput('sc stop ' + iobServiceName, False);
     Log('Stop Service: ' + output);
@@ -1142,7 +1170,7 @@ begin
       marqueePage.SetText(CustomMessage('InstallingNodejs'), Format(CustomMessage('InstallingNodejsVersion'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]));
       marqueePage.Show
       marqueePage.Animate
-      Result := execAndStoreOutput('msiexec /qn /l* ' + getLogNameNodeJsInstall + ' /i ' + ExpandConstant('{tmp}') + '\node.msi', '');
+      Result := execAndStoreOutput('msiexec /qn /l* ' + getLogNameNodeJsInstall + ' /i ' + ExpandConstant('{tmp}') + '\node.msi', '', '');
 
       if LoadStringFromFile(getLogNameNodeJsInstall, logText) then begin
         if Pos('Configuration completed successfully', logText) = 0 then begin
@@ -1156,7 +1184,7 @@ begin
       else begin
         Log('Node.Js installation: No log file found!');
       end;
-
+      marqueePage.SetText(CustomMessage('InstallingNodejs'), '...');
     except
       Log(GetExceptionMessage);
     finally
@@ -1168,6 +1196,40 @@ begin
   end;
 end;
 
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function checkioBrokerRunning(info: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  iobServiceOK: Boolean;
+  portInfo: String;
+  i: Integer;
+begin
+  Log('ioBroker installation completed!');
+  marqueePage.SetText(info, CustomMessage('WaitForService'));
+  for i := 0 to 15 do begin
+    Sleep(1000);
+    iobServiceOK := isIobServiceRunning;
+    if iobServiceOK then break;
+  end;
+  if iobServiceOK then begin
+    Log('ioBroker service was started!');
+    marqueePage.SetText(info, CustomMessage('WaitForAdmin'));
+    for i := 0 to 1000 do begin
+      portInfo := getPortInfo(8081);
+      if portInfo <> '' then break;
+    end;
+    if portInfo <> '' then begin
+      Log('ioBroker Admin is reachable!');
+      Result := True;
+    end
+    else begin
+      Log('ioBroker Admin is not reachable!');
+    end
+  end
+  else begin
+    Log('ioBroker service was not started!');
+  end;
+end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function installioBroker: Boolean;
@@ -1177,9 +1239,6 @@ var
   LogName: String;
   info: String;
   output: String;
-  iobServiceOK: Boolean;
-  portInfo: String;
-  i: Integer;
 begin
   result := False;
   cmd := '';
@@ -1216,33 +1275,9 @@ begin
       // ioBroker.bat makes trouble when calling npx@iobroker..., delete it
       // Don't panic, fix will restore it anyway, and install will install it anyway
       DeleteFile(appInstPath + '\iobroker.bat');
-      if execAndStoreOutput(cmd , LogName) then begin
+      if execAndStoreOutput(cmd , LogName, nodePath) then begin
         if (FileExists(appInstPath + '\instDone')) then begin
-          Log('ioBroker installation completed!');
-          marqueePage.SetText(info, CustomMessage('WaitForService'));
-          for i := 0 to 15 do begin
-            Sleep(1000);
-            iobServiceOK := isIobServiceRunning;
-            if iobServiceOK then break;
-          end;
-          if iobServiceOK then begin
-            Log('ioBroker service was started!');
-            marqueePage.SetText(info, CustomMessage('WaitForAdmin'));
-            for i := 0 to 1000 do begin
-              portInfo := getPortInfo(8081);
-              if portInfo <> '' then break;
-            end;
-            if portInfo <> '' then begin
-              Log('ioBroker Admin is reachable!');
-              Result := True;
-            end
-            else begin
-              Log('ioBroker Admin is not reachable!');
-            end
-          end
-          else begin
-            Log('ioBroker service was not started!');
-          end
+          Result := checkioBrokerRunning(info);
         end
         else begin
           Log('ioBroker installation did not run til the end!');
@@ -1262,10 +1297,10 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function nodeJsUpdateOnly: Boolean;
+function ioBrokerNeedsStart: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
-  Result := (installIoBrokerCB.Checked = False) and (fixIoBrokerCB.Checked);
+  Result := (installIoBrokerCB.Checked = False) and (fixIoBrokerCB.Checked = False);
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -1321,12 +1356,32 @@ begin
       end;
     end;
 
+    if (addFirewallRuleCB.checked) then begin
+      output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall delete rule name="Node for ioBroker (inbound)"', True);
+      Log('Remove firewall inbound:' + output);
+      output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall delete rule name="Node for ioBroker (outbound)"', True);
+      Log('Remove firewall outbound:' + output);
+      output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (inbound)" dir=in action=allow program="' + nodePath + '"\node.exe" enable=yes', True);
+      Log('Modify firewall inbound:' + output);
+      output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (outbound)" dir=out action=allow program="' + nodePath + '"\node.exe" enable=yes', True);
+      Log('Modify firewall outbound:' + output);
+    end;
     if cont then begin
-      if nodeJsUpdateOnly then begin
-        // In this case only Node.js was updated, restart ioBroker
+      if ioBrokerNeedsStart then begin
+        try
+          marqueePage.SetText(CustomMessage('StartIoBroker'), '');
+          marqueePage.Show
+          marqueePage.Animate
+          // In this case ioBroker was not started automatically, restart ioBroker
         // After installation and fix the service is started anyway
         output := execAndReturnOutput('sc start ' + iobServiceName, False);
         Log('Start ioBroker service:' + output);
+          cont := checkioBrokerRunning(CustomMessage('StartIoBroker'));
+        except
+          cont := False;
+        finally
+          marqueePage.Hide
+        end;
       end;
     end;
 
@@ -1369,6 +1424,13 @@ begin
     end
   end;
 
+  Result := Result + NewLine + NewLine + CustomMessage('SummaryFirewall');
+  if addFirewallRuleCB.checked then begin
+    Result := Result + NewLine + Space + Format(CustomMessage('SummaryChangeFirewall'), [appInstPath]);
+  end
+  else begin
+    Result := Result + NewLine + Space + Format(CustomMessage('SummaryNoChangeFirewall'), [appInstPath]);
+  end;
 
   Result := Result + NewLine + NewLine + 'ioBroker:';
 

@@ -54,4 +54,4 @@ russian.InstallationFailedIoBroker=Не удалось установить ioBr
 russian.InstallationFailedIoBrokerFix=Исправление ioBroker не удалось. После нажатия OK отобразится файл журнала. Проверьте его и найдите причину сбоя. Программа установки будет закрыта.
 russian.WaitForService=Ожидание запуска ioBroker
 russian.WaitForAdmin=Ожидание запуска администратора ioBroker
-russian.OpenLogFileDirectory=Что-то пошло не так. Откройте папку с файлом журнала.}
+russian.OpenLogFileDirectory=Что-то пошло не так. Откройте папку с файлом журнала.
