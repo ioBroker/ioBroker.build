@@ -36,6 +36,10 @@ Pre-requires:
 
 
 ## Changelog
+# 2.1.0 (09.03.2023)
+* (Gaspode) Implemented option to modify the Windows firewall
+* (Gaspode) Ensured that the node path was set correctly when calling `npx`
+
 # 2.0.0 (04.03.2023)
 * (Gaspode) Improved look & feel, improved error handling, added several checks, implemented more options
 * (Gaspode) added several languages
