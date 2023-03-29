@@ -108,10 +108,11 @@ end;
 
 // Parse a string value.
 function String_(var JsonParser: TJsonParser): TJsonString;
-var
+{var
   HexDigit, HexValue: Integer;
   I: Integer;
   SpecChar: TJsonChar;
+}
 begin
   Result := '';
   // When parsing for string values, we must look for " and \ characters.
@@ -126,8 +127,11 @@ begin
       end;
       if JsonParser.Ch = '\' then
       begin
+		// Do not modify strings. we want them unchanged!
+		Result := Result + JsonParser.Ch;
         Next(JsonParser, #0);
-        if JsonParser.Ch = 'u' then
+		Result := Result + JsonParser.Ch;
+{       if JsonParser.Ch = 'u' then
         begin
           HexValue := 0;
           for I := 1 to 4 do
@@ -153,6 +157,7 @@ begin
           end;
           Result := Result + SpecChar;
         end;
+}
       end
       else 
         Result := Result + JsonParser.Ch;
@@ -371,7 +376,7 @@ function IndentString(Indent: Integer): TJsonString;
 var
   I: Integer;
 begin
-  for I := 1 to 4 * Indent do
+  for I := 1 to 2 * Indent do
     Result := Result + ' ';
 end;
 
@@ -409,7 +414,11 @@ begin
         Lines.Add(IS1 + S + Comma);
       end;
       JVKArray: PrintJsonArray(Output, V.Index, Indent + 1, Lines, Comma);
-      JVKObject: PrintJsonObject(Output, V.Index, Indent + 1, Lines, Comma);
+      JVKObject:
+	  begin
+		Lines.Add(IS0 + '{');
+		PrintJsonObject(Output, V.Index, Indent + 1, Lines, Comma);
+	  end;
     end;
   end;
   Lines.Add(IS0 + ']' + CommaAfter);
@@ -425,7 +434,7 @@ var
 begin
   IS0 := IndentString(Indent);
   IS1 := IndentString(Indent + 1);
-  Lines.Add(IS0 + '{');
+  // Lines.Add(IS0 + '{');
   for I := 0 to Length(Output.Objects[Index]) - 1 do
   begin
     if I < Length(Output.Objects[Index]) - 1 then
@@ -455,15 +464,21 @@ begin
       end;
       JVKObject:
       begin
-        Lines.Add(IS1 + K + ':');
+        Lines.Add(IS1 + K + ': {');
         PrintJsonObject(Output, V.Index, Indent + 1, Lines, Comma);
       end;
     end;
   end;
-  Lines.Add(IS0 + '}' + CommaAfter);
+  if I = 0 then begin
+	Lines[Lines.Count-1] := Lines[Lines.Count-1] + '}' + CommaAfter;
+  end
+  else begin
+	Lines.Add(IS0 + '}' + CommaAfter);
+  end;
 end;
 
 procedure PrintJsonParserOutput(const Output: TJsonParserOutput; Lines: TStringList);
 begin
+  Lines.Add('{');
   PrintJsonObject(Output, 0, 0, Lines, '');
 end;
