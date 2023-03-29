@@ -6,12 +6,17 @@
 ; - 03.03.2023 Gaspode: Improved look & feel, improved error handling, added several checks,   -
 ; -                     implemented more options                                               -
 ; - 04.03.2023 Gaspode: Added several languages                                                -
-; - 07.03.2023 Gaspode: Ensure that node path is set correctly when calling npx                -
+; - 07.03.2023 Gaspode: Ensure that node path is set correctly when calling 'npx'              -
 ; - 08.03.2023 Gaspode: Implemented option to modify Windows firewall                          -
-; -                                                                                            -
+; - 10.03.2023 Gaspode: Layout optimizations                                                   -
+; - 18.03.2023 Gaspode: Refactored and optimzed code, cleanup                                  -
+; - 21.03.2023 Gaspode: Support multi server installations in expert mode                      -
+; - 22.03.2023 Gaspode: Copy the installer itself to ioBroker directory and create shortcut    -
+; - 25.03.2023 Gaspode: Recognize stabilostick installation folder and abort installation      -
+; - 26.03.2023 Gaspode: Data migration for new installations implemented                       -
+; - 29.03.2023 Gaspode: Translations completed                                                 -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
-
 #define MyAppName "ioBroker automation platform"
 #define MyAppShortName "ioBroker"
 #define MyAppLCShortName "iobroker"
@@ -49,11 +54,18 @@ ChangesEnvironment=yes
 
 [Icons]
 Name: "{group}\Uninstall {#MyAppShortName}"; Filename: "{uninstallexe}"; IconFilename: {app}\{#MyAppIcon};
+Name: "{group}\[{code:getIobServiceName}] ioBroker Admin"; Filename: "http://localhost:{code:getIobAdminPortStr}"; IconFilename: "{app}\{#MyAppIcon}"; Check: UpdateAdminShortcut
+Name: "{group}\ioBroker Setup"; Filename: "{app}\ioBrokerInstaller.exe"; IconFilename: "{app}\{#MyAppIcon}";
 
 [Files]
 Source: "resource\{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "resource\port.bat"; DestDir: "{tmp}"
-Source: "{tmp}\~iobinfo.json"; DestDir: "{app}"; Flags: external
+Source: "{srcexe}"; DestDir: "{app}"; DestName: "ioBrokerInstaller.exe"; Flags: external overwritereadonly replacesameversion
+
+; Do not display required disk space:
+[Messages]
+DiskSpaceGBLabel=
+DiskSpaceMBLabel=
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -80,8 +92,8 @@ Name: "ukrainian"; MessagesFile: "compiler:Languages\Ukrainian.isl"
 #include "language\ukrainian.txt"
 
 [Run]
-Filename: http://localhost:8081/; Description: "{cm:OpenIoBrokerSettings}"; Flags: postinstall shellexec;  Check: success
-Filename: {win}\explorer; Parameters: "{app}\log";Description: "{cm:OpenLogFileDirectory}"; Flags: postinstall shellexec;  Check: not success
+Filename: http://localhost:{code:getIobAdminPortStr}/; Description: "{cm:OpenIoBrokerSettings}"; Flags: postinstall shellexec;  Check: success and not deinstalled
+Filename: {win}\explorer; Parameters: "{code:getIobPath}\log";Description: "{cm:OpenLogFileDirectory}"; Flags: postinstall shellexec;  Check: not success
 
 [UninstallRun]
 ; Removes System Service
@@ -98,84 +110,226 @@ Type: filesandordirs; Name: "{app}\*.json"
 Type: filesandordirs; Name: "{app}\*.ps1"
 Type: filesandordirs; Name: "{app}\*.sh"
 Type: filesandordirs; Name: "{app}\LICENSE"
+Type: filesandordirs; Name: "{app}\.env"
 Type: filesandordirs; Name: "{app}\instDone"
 Type: filesandordirs; Name: "{app}\daemon"
 Type: filesandordirs; Name: "{app}\node_modules"
 Type: filesandordirs; Name: "{app}\install"
 Type: filesandordirs; Name: "{app}\log"
 Type: filesandordirs; Name: "{app}\semver"
+Type: filesandordirs; Name: "{app}\iobroker-data_old"
+
+[Registry]
+Root: HKLM; Subkey: "Software\ioBroker"; Flags: uninsdeletekey dontcreatekey
 
 [Code]
+{
+  First Time:
+      Normal: Welcome -> License -> Directory -------------------------------------------------> Gather Data -> Summary -> Options -> Ready -> Install -> Completed
+      Expert: Welcome -> License -> Directory -> ExpertOptions --new-------> ExpertSettings ---> Gather Data -> Summary -> Options -> Ready -> Install -> Completed
+                                                               |-maintain--> set selected dir -> Gather Data -> Summary -> Options -> Ready -> Install -> Completed
+                                                               |-uninstall-> set selected dir -> Gather Data -----------------------> Ready -> Install -> Completed
+
+   Already Installed:
+      Normal: Welcome --------------------------------------------------> Gather Data -> Summary -> Options -> Ready -> Install -> Completed
+      Expert: Welcome -> ExpertOptions --new--------> ExpertSettings ---> Gather Data -> Summary -> Options -> Ready -> Install -> Completed
+                                       |--maintain--> set selected dir -> Gather Data -> Summary -> Options -> Ready -> Install -> Completed
+                                       |--uninstall-> set selected dir -> Gather Data -----------------------> Ready -> Install -> Completed
+}
 #include "resource\JsonParser.pas"
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 { Global variables are initialized with 0, '' or nil by default                                                                                                                                    }
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
-  appInstPath: String;
 
-  instNodeVersionMajor: Integer;
-  instNodeVersionMinor: Integer;
-  instNodeVersionPatch: Integer;
-
-  rcmdNodeVersionMajor: Integer;
-  rcmdNodeVersionMinor: Integer;
-  rcmdNodeVersionPatch: Integer;
-
-  acceptedNodeVersions: array of Integer;
-
-  iobVersionMajor: Integer;
-  iobVersionMinor: Integer;
-  iobVersionPatch: Integer;
-
-  iobControllerFoundNoNode: Boolean;
-
-  rcmdNodeDownloadPath: String;
-
-  nodePath: String;
-
+  // Summary page and its controls
   summaryPage: TWizardPage;
+  sumInfo1NodeLabel: TLabel;
+  sumInfo2NodeLabel: TLabel;
+  sumInfo3NodeLabel: TLabel;
+  sumInfo1IoBrokerLabel: TLabel;
+  sumInfo2IoBrokerLabel: TLabel;
+  sumInfo1IoBrokerRunLabel: TLabel;
+  sumInfo2IoBrokerRunLabel: TLabel;
+  sumInfo1PortStatesLabelA: TLabel;
+  sumInfo2PortStatesLabelA: TLabel;
+  sumInfo1PortObjectsLabelA: TLabel;
+  sumInfo2PortObjectsLabelA: TLabel;
+  sumInfo1PortAdminLabelA: TLabel;
+  sumInfo2PortAdminLabelA: TLabel;
+  sumInfo1PortStatesLabelB: TLabel;
+  sumInfo2PortStatesLabelB: TLabel;
+  sumInfo1PortObjectsLabelB: TLabel;
+  sumInfo2PortObjectsLabelB: TLabel;
+  sumInfo1PortAdminLabelB: TLabel;
+  sumInfo2PortAdminLabelB: TLabel;
+  sumSummaryLabel: TLabel;
+
+  // options page and its controls
   optionsPage: TWizardPage;
+  optInstallNodeCB: TCheckBox;
+  optInstallIoBrokerCB: TCheckBox;
+  optFixIoBrokerCB: TCheckBox;
+  optAddFirewallRuleCB: TCheckBox;
+  optDataMigrationCB: TCheckBox;
+  optDataMigrationButton: TButton;
+  optDataMigrationLabel: TLabel;
+  optAdditionalHintsLabel: TLabel;
+  sumRetryButton: TButton;
 
-  info1NodeLabel: TLabel;
-  info2NodeLabel: TLabel;
-  info3NodeLabel: TLabel;
-  info1IoBrokerLabel: TLabel;
-  info2IoBrokerLabel: TLabel;
-  info1IoBrokerRunLabel: TLabel;
-  info2IoBrokerRunLabel: TLabel;
-  info1Port9000Label: TLabel;
-  info2Port9000Label: TLabel;
-  info1Port9001Label: TLabel;
-  info2Port9001Label: TLabel;
-  info1Port8081Label: TLabel;
-  info2Port8081Label: TLabel;
-  summaryLabel: TLabel;
+  // Expert Options page and controls:
+  expertOptionsPage: TWizardPage;
+  exoIntroLabel: TLabel;
+  exoNewServerRB: TRadioButton;
+  exoMaintainServerRB: TRadioButton;
+  exoUninstallServerRB: TRadioButton;
+  exoNewServerLabel: TLabel;
+  exoMaintainServerCombo: TComboBox;
+  exoUninstallServerCombo: TComboBox;
 
-  installNodeCB: TCheckBox;
-  installNodeLabel: TLabel;
-  installIoBrokerCB: TCheckBox;
-  installIoBrokerLabel: TLabel;
-  fixIoBrokerCB: TCheckBox;
-  fixIoBrokerLabel: TLabel;
-  addFirewallRuleCB: TCheckBox;
-  addFirewallRuleLabel: TLabel;
+  // Expert Settings page and controls:
+  expertSettingsPage: TWizardPage;
+  exsIntroLabel: TLabel;
+  exsServerNameLabel: TLabel;
+  exsServerNameEdit: TEdit;
+  exsStatesPortLabel: TLabel;
+  exsStatesPortEdit: TEdit;
+  exsObjectsPortLabel: TLabel;
+  exsObjectsPortEdit: TEdit;
+  exsAdminPortLabel: TLabel;
+  exsAdminPortEdit: TEdit;
 
-  additionalHintsLabel: TLabel;
+  // Global expert checkbox, checked if installer is in expert mode
+  expertCB: TCheckBox;
 
-  retryButton: TButton;
+
+  // Progres pages
   progressPage: TOutputProgressWizardPage;
   marqueePage: TOutputMarqueeProgressWizardPage;
 
-  readyToInstall: Boolean;
-  tryStopServiceAtNextRetry: Boolean;
+  readyToInstall: Boolean;            // True if all preconditions are fullfilled to start the installation/fix/other option
+  tryStopServiceAtNextRetry: Boolean; // True if the iob service shall be shut down when pressing Retry button
+  iobControllerFoundNoNode: Boolean;  // True, if iobroker jscontroller was found in the active path, but no Node.js softare installed
 
-  iobServiceName: String;
-  iobServiceExists: Boolean;
-  iobInstalled: Boolean;
+  nodePath: String;                       // Local Path to currently installed node.exe
+  rcmdNodeDownloadPath: String;           // The path (URL) to the currently recommended Node.js MSI file
+  acceptedNodeVersions: array of Integer; // Currently supported node major versions
 
-  isUpgrade: Boolean;
+  instNodeVersionMajor: Integer;          // Major Version of installed Node.js software
+  instNodeVersionMinor: Integer;          // Minor Version of installed Node.js software
+  instNodeVersionPatch: Integer;          // PatchVersion of installed Node.js software
 
-  installationSuccessful: Boolean;
+  rcmdNodeVersionMajor: Integer;          // Major Version of recommended Node.js software
+  rcmdNodeVersionMinor: Integer;          // Minor Version of recommended Node.js software
+  rcmdNodeVersionPatch: Integer;          // Patch Version of recommended Node.js software
+
+
+  iobRootPath: String;       // Root Path of all ioBroker installations, equal to appInstPath if not expert mode or "basic" iob installation
+  appInstPath: String;       // Path to the currently handled iob server installation
+  iobServiceName: String;    // The service name of the currently handled iob server installation
+  iobObjectsPort: Integer;   // objects port of the currently handled iob server installation
+  iobStatesPort: Integer;    // states port of the currently handled iob server installation
+  iobAdminPort: Integer;     // Admin port of the currently handled iob server installation
+  iobServerName: String;     // Servername (Hostname) of the currently handled iob server installation
+
+  iobTargetServiceName: String;  // The target service name of the currently to be installed iob server installation
+
+  iobVersionMajor: Integer;  // Major Version of the  currently handled iob server installation
+  iobVersionMinor: Integer;  // Minor Version of the  currently handled iob server installation
+  iobVersionPatch: Integer;  // Patch Version of the  currently handled iob server installation
+
+  iobServiceExists: Boolean;     // True if a windows service with service name 'iobServiceName' already exists
+  iobInstalled: Boolean;         // True if an ioBroker installation was found and verified in the currently handled path
+  isFirstInstallerRun: Boolean;  // True if installer is executed the first time, i.e. in also in standard mode a path can be selected
+
+  installationSuccessful: Boolean; // True if the installation was successful
+
+  expertRegRoot: String;
+
+procedure gatherInstNodeData; forward;
+function reconfigureIoBroker(info: String; logFileName: String): Boolean; forward;
+function reconfigureIoBrokerPorts(statesPort: Integer; objectsPort: Integer; logFileName: String): Boolean; forward;
+function reconfigureIoBrokerAdminPort(adminPort: Integer; logFileName: String): Boolean; forward;
+function reconfigureIoBrokerServerName(serverName: String; logFileName: String): Boolean; forward;
+procedure retryTestReady(sender: TObject); forward;
+procedure expertOptionChanged(sender: TObject); forward;
+procedure updateExpertOptonsPage; forward;
+procedure updateExpertSettingsPage; forward;
+procedure keyPressServerName(sender: TObject; var key: Char); forward;
+procedure keyPressStatesPort(sender: TObject; var key: Char); forward;
+procedure keyPressObjectsPort(sender: TObject; var key: Char); forward;
+procedure keyPressAdminPort(sender: TObject; var key: Char); forward;
+function checkPort(var edit: TEdit; var portNumber: Integer): Boolean; forward;
+function checkAndSetExpertSettings: Boolean; forward;
+function stopIobService(serviceName: String; logFileName: String): Boolean; forward;
+procedure showExpertMode(sender: TObject); forward;
+procedure expertModeCBClicked(sender: TObject); forward;
+function expertInstallationExists: Boolean; forward;
+
+{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ Helper functions for the [xyz] sections of inno setup
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getIobAdminPortStr(Param: String): String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := IntToStr(iobAdminPort);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getIobPath(Param: String): String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := appInstPath;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getIobServiceName(Param: String): String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := iobServiceName;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getNodePath(Param: String): String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  gatherInstNodeData;
+  Result := nodePath;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function success: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := installationSuccessful;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function deinstalled: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := expertCB.Checked and exoUninstallServerRB.Checked;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function UserDefAdminPort: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := iobAdminPort <> 8081;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function UpdateAdminShortcut: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := UserDefAdminPort and not exoUninstallServerRB.Checked;
+end;
+
+{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ general helper functions
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function GetHKLM: Integer;
@@ -188,10 +342,62 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function FindJsonStrValue(
+Function fillStringWithBlanks(str: String; count: Integer): String;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-  Output: TJsonParserOutput; Parent: TJsonObject; Key: TJsonString;
-  var Value: String): Boolean;
+var
+  i: Integer;
+begin
+  Result := str;
+  for i := 0 to count - Length(str) do begin
+    Result := Result + ' ';
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function FindJsonObject(Output: TJsonParserOutput; Parent: TJsonObject; Key: TJsonString; var Value: TJsonObject): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  I: Integer;
+begin
+  for I := 0 to Length(Parent) - 1 do
+  begin
+    if Parent[I].Key = Key then
+    begin
+      if (Parent[I].Value.Kind = JVKObject) then
+      begin
+        Value := Output.Objects[Parent[i].Value.Index];
+        Result := True;
+        Exit;
+      end
+    end;
+  end;
+  Result := False;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function FindJsonNumber(Output: TJsonParserOutput; Parent: TJsonObject; Key: TJsonString; var Value: TJsonNumber): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  I: Integer;
+begin
+  for I := 0 to Length(Parent) - 1 do
+  begin
+    if Parent[I].Key = Key then
+    begin
+      if (Parent[I].Value.Kind = JVKNumber) then
+      begin
+        Value := Output.Numbers[Parent[i].Value.Index];
+        Result := True;
+        Exit;
+      end
+    end;
+  end;
+  Result := False;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function FindJsonStrValue(Output: TJsonParserOutput; Parent: TJsonObject; Key: TJsonString; var Value: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   I: Integer;
 begin
@@ -211,10 +417,8 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function FindJsonStrArray(
+function FindJsonStrArray(Output: TJsonParserOutput; Parent: TJsonObject; Key: TJsonString; var values: TArrayOfString): Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-  Output: TJsonParserOutput; Parent: TJsonObject; Key: TJsonString;
-  var values: TArrayOfString): Boolean;
 var
   I: Integer;
   J: Integer;
@@ -242,22 +446,24 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function OnDownloadProgress(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
+function UpdateJsonNumber(Output: TJsonParserOutput; Parent: TJsonObject; Key: TJsonString; Value: TJsonNumber): Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  I: Integer;
 begin
-  if Progress = ProgressMax then
-    Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
-  Result := True;
-end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function OnDownloadProgressNode(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-begin
-  progressPage.SetProgress(Progress, ProgressMax);
-  if Progress = ProgressMax then
-    Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
-  Result := True;
+  for I := 0 to Length(Parent) - 1 do
+  begin
+    if Parent[I].Key = Key then
+    begin
+      if (Parent[I].Value.Kind = JVKNumber) then
+      begin
+        Output.Numbers[Parent[i].Value.Index] := Value;
+        Result := True;
+        Exit;
+      end
+    end;
+  end;
+  Result := False;
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -298,7 +504,7 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function execAndReturnOutput(myCmd: String; allLines: Boolean): String;
+function execAndReturnOutput(myCmd: String; allLines: Boolean; addPath: String; wrkDir: String): String;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   tmpTxtFileName: String;
@@ -311,13 +517,20 @@ begin
   tmpTxtFileName := ExpandConstant('{tmp}') + '\~iobinst_tmp.txt';
   tmpBatFileName := ExpandConstant('{tmp}') + '\~iobinst_tmp.bat';
 
+  if addPath <> '' then begin
+    myCmd := '@echo off' + chr(13) + chr(10) + 'SET PATH=' + addPath + ';%PATH%' + chr(13) + chr(10) + myCmd;
+  end
+  else begin
+    myCmd := '@echo off' + chr(13) + chr(10) + myCmd;
+  end;
+
   if (SaveStringToFile(tmpBatFileName, '@' + myCmd, false)) then begin
-    if (Exec(ExpandConstant('{cmd}'), '/C ' + tmpBatFileName + ' > "' + tmpTxtFileName + '"', '', SW_HIDE, ewWaitUntilTerminated, resultCode)) then begin
+    if (Exec(ExpandConstant('{cmd}'), '/C ' + tmpBatFileName + ' > "' + tmpTxtFileName + '" 2>&1', wrkDir, SW_HIDE, ewWaitUntilTerminated, resultCode)) then begin
       if LoadStringsFromFile(tmpTxtFileName, stdOutTxt) then begin
         if GetArrayLength(stdOutTxt) > 0 then begin
           if allLines then begin
             for i := 0 to GetArrayLength(stdOutTxt)-1 do begin
-              Result := Result + stdOutTxt[i] + '%n';
+              Result := Result + stdOutTxt[i] + chr(13) + chr(10);
             end;
           end
           else begin
@@ -332,7 +545,7 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function execAndStoreOutput(myCmd: String; myLogFileName: String; addPath: String) : Boolean;
+function execAndStoreOutput(myCmd: String; myLogFileName: String; addPath: String; wrkDir: String) : Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   tmpBatFileName: String;
@@ -340,14 +553,7 @@ var
   logPart: String;
 begin
   Result := False;
-  tmpBatFileName := ExpandConstant('{tmp}') + '\~iobExec_tmp.bat';
-
-  if myLogFileName <> '' then begin
-    logPart := ' > "' + myLogFileName + '" 2>&1';
-  end
-  else begin
-    logPart := '';
-  end;
+  tmpBatFileName := ExpandConstant('{tmp}') + '\~iobinst_tmp.bat';
 
   if addPath <> '' then begin
     myCmd := '@echo off' + chr(13) + chr(10) + 'SET PATH=' + addPath + ';%PATH%' + chr(13) + chr(10) + myCmd;
@@ -356,13 +562,232 @@ begin
     myCmd := '@echo off' + chr(13) + chr(10) + myCmd;
   end;
 
-  if (SaveStringToFile(tmpBatFileName, myCmd + logPart, false)) then begin
-    Sleep(1000);
-    if (Exec(ExpandConstant('{cmd}'), '/C ' + tmpBatFileName + logPart, appInstPath, SW_HIDE, ewWaitUntilTerminated, resultCode)) then begin
+  if myLogFileName <> '' then begin
+    logPart := ' > "' + myLogFileName + '" 2>&1';
+  end
+  else begin
+    logPart := '';
+  end;
+
+  if (SaveStringToFile(tmpBatFileName, '@' + myCmd, false)) then begin
+    if (Exec(ExpandConstant('{cmd}'), '/C ' + tmpBatFileName + logPart, wrkDir, SW_HIDE, ewWaitUntilTerminated, resultCode)) then begin
       Result := True;
     end;
   end;
   DeleteFile(tmpBatFileName);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function directoryCopy(SourcePath, DestPath: string): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  FindRec: TFindRec;
+  SourceFilePath: string;
+  DestFilePath: string;
+begin
+  Result := True;
+  if DirExists(DestPath) or CreateDir(DestPath) then begin
+    if FindFirst(SourcePath + '\*', FindRec) then begin
+      try
+        repeat
+          if (FindRec.Name <> '.') and (FindRec.Name <> '..') then begin
+            SourceFilePath := SourcePath + '\' + FindRec.Name;
+            DestFilePath := DestPath + '\' + FindRec.Name;
+            if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY = 0 then begin
+              if FileCopy(SourceFilePath, DestFilePath, False) then begin
+                Log(Format('Copied %s to %s', [SourceFilePath, DestFilePath]));
+                marqueePage.setText(CustomMessage('Copying'), Format('%s', [DestFilePath]));
+
+              end
+              else begin
+                Log(Format('Failed to copy %s to %s', [SourceFilePath, DestFilePath]));
+                Result := False;
+              end;
+            end
+            else begin
+              if DirExists(DestFilePath) or CreateDir(DestFilePath) then begin
+                Log(Format('Created %s', [DestFilePath]));
+                Result := directoryCopy(SourceFilePath, DestFilePath);
+              end
+              else begin
+                Log(Format('Failed to create %s', [DestFilePath]));
+                Result := False;
+              end;
+            end;
+          end;
+        until not FindNext(FindRec);
+      finally
+        FindClose(FindRec);
+      end;
+    end
+    else begin
+      Log(Format('Failed to list %s', [SourcePath]));
+      Result := False;
+    end;
+  end
+  else begin
+    Log(Format('Failed to create %s', [DestPath]));
+    Result := False;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function isDirectoryEmpty(path: string): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  FindRec: TFindRec;
+begin
+  Result := True;
+  if DirExists(path) then begin
+    if FindFirst(path + '\*', FindRec) then begin
+      try
+        repeat
+          if (FindRec.Name <> '.') and (FindRec.Name <> '..') then begin
+            Result := False;
+            Exit;
+          end;
+        until not FindNext(FindRec);
+      finally
+        FindClose(FindRec);
+      end;
+    end;
+  end;
+end;
+
+{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ Logfile names
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getLogNameNodeJsInstall: String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := appInstPath + '\log\installNodeJs.log';
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getLogNameIoBrokerInstall: String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := appInstPath + '\log\installIoBroker.log';
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getLogNameIoBrokerFix: String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := appInstPath + '\log\installIoBrokerFix.log';
+end;
+
+{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ Callbacks for downloads
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function OnDownloadProgress(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if Progress = ProgressMax then
+    Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
+  Result := True;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function OnDownloadProgressNode(const Url, FileName: String; const Progress, ProgressMax: Int64): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  progressPage.SetProgress(Progress, ProgressMax);
+  if Progress = ProgressMax then
+    Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
+  Result := True;
+end;
+
+{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ Functions to get system information
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function ioBrokerNeedsStart: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := (optInstallIoBrokerCB.Checked = False) and (optFixIoBrokerCB.Checked = False);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function isIobServiceRunning(serviceName: String): boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  statusString: String;
+begin
+  statusString := execAndReturnOutput('sc query ' + serviceName + '.exe', True, '', '');
+  Log(Format('ioBroker Service Status: %s', [statusString]));
+  Result := pos('RUNNING', statusString) > 0;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getPortInfo(port: Integer): String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := execAndReturnOutput(Format('%s\port.bat %d', [ExpandConstant('{tmp}'), port]), False, '', '');
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function checkIoBrokerRunning(info: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  iobServiceOK: Boolean;
+  portInfo: String;
+  i: Integer;
+begin
+  Result := False;
+  marqueePage.SetText(info, CustomMessage('WaitForService'));
+  for i := 0 to 15 do begin
+    Sleep(1000);
+    iobServiceOK := isIobServiceRunning(iobServiceName);
+    if iobServiceOK then break;
+  end;
+  if iobServiceOK then begin
+    Log('ioBroker service was started!');
+    marqueePage.SetText(info, CustomMessage('WaitForAdmin'));
+    for i := 0 to 100 do begin
+    Sleep(500);
+      portInfo := getPortInfo(iobAdminPort);
+      if portInfo <> '' then break;
+    end;
+    if portInfo <> '' then begin
+      Log('ioBroker Admin is reachable!');
+      Result := True;
+    end
+    else begin
+      Log('ioBroker Admin is not reachable!');
+    end
+  end
+  else begin
+    Log('ioBroker service was not started!');
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getIoBrokerServiceNameFromEnv(iobPath: String): String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  envText: TArrayOfString;
+  i: Integer;
+begin
+  Result := 'ioBroker'; // Default server name if no .env file exists
+  // Check for user defined service name:
+  if FileExists(iobPath + '\.env') then begin
+    if LoadStringsFromFile(iobPath + '\.env', envText) then begin
+      if GetArrayLength(envText) > 0 then begin
+        for i := 0 to GetArrayLength(envText)-1 do begin
+          if Pos('iobservicename=', Lowercase(envText[i])) = 1 then begin
+            Result := Trim(Copy(envText[i], 16, Length(envText[i])-15));
+            Log('ioB service name: ' + Result);
+          end;
+        end;
+      end;
+    end;
+  end;
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -374,12 +799,16 @@ var
   versionString: String;
 begin
   Result := False;
+  iobVersionMajor := 0;
+  iobVersionMinor := 0;
+  iobVersionPatch := 0;
+
   ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
   if (FileExists(ioBrokerEx)) then begin
     Result := True;
     if (nodePath <> '') then begin
       nodeJsEx := nodePath + '\node.exe';
-      versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" --version', False);
+      versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" --version', False, nodePath, '');
       if (convertVersion(versionString, iobVersionMajor, iobVersionMinor, iobVersionPatch)) then begin
         Log(Format('Found ioBroker version: %d, %d, %d', [iobVersionMajor, iobVersionMinor, iobVersionPatch]));
       end
@@ -387,22 +816,115 @@ begin
     else begin
       iobControllerFoundNoNode := True;
       Log('ioBroker.js-controller found, but Node.js not found.');
-    end
+    end;
   end
   else begin
     Log('ioBroker.js-controller not found.');
+  end;
+
+  if expertCB.Checked and exoNewServerRB.Checked then begin
+    // In this case we use the entered service name, because the according .env file was not created yet
+    iobServiceName := iobTargetServiceName;
   end
+  else begin
+    // Otherwise we use the service name from the .env file
+    iobServiceName := getIoBrokerServiceNameFromEnv(appInstPath);
+  end;
+
+  iobServiceExists := (execAndReturnOutput('sc GetDisplayName ' + iobServiceName + '.exe | find /C "' + iobServiceName + '"', False, '', '') = '1');
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function isIobServiceRunning: boolean;
+function getIobAdminPort(iobPath: String): Integer;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
-  statusString: String;
+  ioBrokerEx: String;
+  nodeJsEx: String;
+  tmpFileName: String;
+  instanceList: TArrayOfString;
+  i: Integer;
+  startIdx: Integer;
+  endIdx: Integer;
+  tmpStr: String;
 begin
-  statusString := execAndReturnOutput('sc query ' + iobServiceName, True);
-  Log(Format('ioBroker Service Status: %s', [statusString]));
-  Result := pos('RUNNING', statusString) > 0;
+  ioBrokerEx := iobPath + '\node_modules\iobroker.js-controller/iobroker.js';
+  if (FileExists(ioBrokerEx)) and (nodePath <> '' )then begin
+    nodeJsEx := nodePath + '\node.exe';
+    tmpFileName := ExpandConstant('{tmp}') + '\~iobinstAdmin_tmp.txt';
+    if execAndStoreOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" list instances', tmpFileName, nodePath, '' ) then begin
+      if LoadStringsFromFile(tmpFileName, instanceList) then begin
+        if GetArrayLength(instanceList) > 0 then begin
+          for i := 0 to GetArrayLength(instanceList)-1 do begin
+            if Pos('system.adapter.admin', instanceList[i]) > 0 then begin
+              startIdx := Pos('enabled', instanceList[i]);
+              if startIdx > 0 then begin
+                tmpStr := Copy(instanceList[i], startIdx, Length(instanceList[i]) - startIdx)
+                startIdx := Pos('port:', tmpStr);
+                if startIdx > 0 then begin
+                  tmpStr := Copy(tmpStr, startIdx + 5, Length(tmpStr) - startIdx - 3);
+                  endIdx := Pos(',', tmpStr);
+                  if endIdx > 0 then begin
+                    tmpStr := Copy(tmpStr, 1, endIdx-1);
+                    Result := StrToIntDef(Trim(tmpStr), 8081);
+                    Log('Admin port found!');
+                  end;
+                end;
+              end;
+            end;
+          end;
+        end;
+      end;
+    end;
+  end;
+  DeleteFile(tmpFileName);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure gatherIobPortsAndServername(iobPath: String; var statesPort: Integer; var objectsPort: Integer; var adminPort: Integer; var serverName: string);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  JsonParser: TJsonParser;
+  jsonString: AnsiString;
+  jsonObject: TJsonObject;
+  jsonPort: TJsonNumber;
+begin
+  // states and objects port:
+  if FileExists(iobPath + '\iobroker-data\iobroker.json') then begin
+    LoadStringFromFile(iobPath + '\iobroker-data\iobroker.json', jsonString);
+    ClearJsonParser(JsonParser);
+    ParseJson(JsonParser, jsonString);
+    if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'states', jsonObject) then begin
+      if FindJsonNumber(JsonParser.Output, jsonObject, 'port', jsonPort) then begin
+        statesPort := Round(jsonPort);
+        Log('States port found!');
+      end;
+    end;
+    if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'objects', jsonObject) then begin
+      if FindJsonNumber(JsonParser.Output, jsonObject, 'port', jsonPort) then begin
+        objectsPort := Round(jsonPort);
+        Log('Objects port found!');
+      end;
+    end;
+    if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'system', jsonObject) then begin
+      if FindJsonStrValue(JsonParser.Output, jsonObject, 'hostname', serverName) then begin
+        if servername = '' then begin
+          serverName := '<Default>';
+        end;
+        Log('Hostname/Servername found!');
+      end
+      else begin
+        Log('Hostname/Servername NOT found!');
+      end;
+    end;
+  end;
+
+  // Admin port:
+  iobAdminPort := getIobAdminPort(iobPath);
+
+  Log(Format('statesPort:  %d', [statesPort]));
+  Log(Format('objectsPort: %d', [objectsPort]));
+  Log(Format('adminPort:   %d', [adminPort]));
+  Log(Format('serverName:  %s', [serverName]));
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -426,18 +948,11 @@ begin
     end;
     }
     // Check the service instead:
-    Result := isIobServiceRunning
+    Result := isIobServiceRunning(iobServiceName);
   end
   else begin
     Log('ioBroker.js-controller not found.');
   end
-end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function getPortInfo(port: Integer): String;
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-begin
-  Result := execAndReturnOutput(Format('%s\port.bat %d', [ExpandConstant('{tmp}'), port]), False);
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -448,6 +963,9 @@ var
   found: boolean;
 begin
   found := false;
+  instNodeVersionMajor := 0;
+  instNodeVersionMinor := 0;
+  instNodeVersionPatch := 0;
 
   if RegKeyExists(GetHKLM, 'SOFTWARE\Node.js') then begin
     if (RegQueryStringValue(GetHKLM, 'SOFTWARE\Node.js', 'InstallPath', nodePath)) then begin
@@ -468,14 +986,6 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function getNodePath(Param: String): String;
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-begin
-  gatherInstNodeData;
-  Result := nodePath;
-end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 procedure gatherNodeData;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
@@ -490,18 +1000,51 @@ var
   startPos: Integer;
   versionString: String;
   nodeFileName: String;
+  errorOccurred: Boolean;
 begin
+  errorOccurred := False;
   try
     if rcmdNodeVersionMajor = 0 then begin
-      DownloadTemporaryFile('https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.info/master/admin/lib/data/infoData.json', '~iobinfo.json', '', @OnDownloadProgress);
-      LoadStringFromFile(ExpandConstant('{tmp}') + '\~iobinfo.json', jsonString);
-      ClearJsonParser(JsonParser);
-      ParseJson(JsonParser, jsonString);
-      FindJsonStrValue (JsonParser.Output, JsonParser.Output.Objects[0], 'nodeRecommended', nodeRecommendedStr);
-      Log('--->Node Recommended: '+nodeRecommendedStr);
-      Log('--->'+'https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt');
+      try
+        DownloadTemporaryFile('https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.info/master/admin/lib/data/infoData.json', '~iobinfo.json', '', @OnDownloadProgress);
+      except
+        errorOccurred := True;
+      end;
+      if not errorOccurred then begin
+        LoadStringFromFile(ExpandConstant('{tmp}') + '\~iobinfo.json', jsonString);
+        ClearJsonParser(JsonParser);
+        ParseJson(JsonParser, jsonString);
+        if Length(JsonParser.Output.Objects) > 0 then begin
+          if FindJsonStrValue(JsonParser.Output, JsonParser.Output.Objects[0], 'nodeRecommended', nodeRecommendedStr) then begin
+            Log('Node Recommended: '+nodeRecommendedStr);
+            Log('->'+'https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt');
+          end
+          else begin
+            errorOccurred := True;
+          end;
+          FindJsonStrArray (JsonParser.Output, JsonParser.Output.Objects[0], 'nodeAccepted', nodeAcceptedStrings);
+          setArrayLength(acceptedNodeVersions, GetArrayLength(nodeAcceptedStrings));
+          for i:=0 to GetArrayLength(nodeAcceptedStrings)-1 do begin
+            acceptedNodeVersions[i] := StrToIntDef(Copy(nodeAcceptedStrings[i], 2, Length(nodeAcceptedStrings[i])-1), 0);
+            Log(Format('Node Accepted: %d',[acceptedNodeVersions[i]]));
+          end;
+        end
+        else begin
+          errorOccurred := True;
+        end;
+      end;
+      if errorOccurred then begin
+        MsgBox(Format(CustomMessage('DownloadError'), ['https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.info/master/admin/lib/data/infoData.json']), mbError, MB_OK);
+        Exit;
+      end;
 
-      DownloadTemporaryFile('https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt', '', @OnDownloadProgress);
+      try
+        DownloadTemporaryFile('https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt', '', @OnDownloadProgress);
+      except
+        Log(GetExceptionMessage);
+        MsgBox(Format(CustomMessage('DownloadErrorGatherNode'), ['https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt']), mbError, MB_OK);
+        Exit;
+      end;
       if LoadStringsFromFile(ExpandConstant('{tmp}') + '\~nodeInfo.txt', nodeLatestList) then begin
         if (IsWin64) then begin
           searchString := '-x64.msi';
@@ -528,12 +1071,6 @@ begin
             end;
           end;
         end;
-      end;
-      FindJsonStrArray (JsonParser.Output, JsonParser.Output.Objects[0], 'nodeAccepted', nodeAcceptedStrings);
-      setArrayLength(acceptedNodeVersions, GetArrayLength(nodeAcceptedStrings));
-      for i:=0 to GetArrayLength(nodeAcceptedStrings)-1 do begin
-        acceptedNodeVersions[i] := StrToIntDef(Copy(nodeAcceptedStrings[i], 2, Length(nodeAcceptedStrings[i])-1), 0);
-        Log(Format('--->Node Accepted: %d',[acceptedNodeVersions[i]]));
       end;
     end;
   except
@@ -562,13 +1099,150 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-procedure retryTestReady(sender: TObject); forward;
+function checkForStabilostickInstallation(path: String): Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-procedure updateSummaryPage;
+begin
+  Result := DirExists(path + '\nodejs');
+end;
+
+{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ Update page functions
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure updateSummaryPagePortsA(statesPort: Integer; objectsPort: Integer; adminPort: Integer; var portsInUse: Boolean; maxProgress: Integer; var progress: Integer);
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   portInfo: String;
   portInfoArray: TArrayOfString;
+begin
+  portInfo := getPortInfo(statesPort);
+  if portinfo <> '' then begin
+    explode(portInfoArray, portInfo, ';');
+    sumInfo1PortStatesLabelA.Font.Color := clRed;
+    sumInfo1PortStatesLabelA.Caption := '⚠';
+    sumInfo2PortStatesLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+    readyToInstall := False;
+    portsInUse := True;
+  end
+  else begin
+    sumInfo1PortStatesLabelA.Font.Color := clGreen;
+    sumInfo1PortStatesLabelA.Caption := '✓';
+    sumInfo2PortStatesLabelA.Caption := Format(CustomMessage('PortAvailable'), [statesPort]);
+  end;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
+
+  portInfo := getPortInfo(objectsPort);
+  if portInfo <> '' then begin
+    explode(portInfoArray, portInfo, ';');
+    sumInfo1PortObjectsLabelA.Font.Color := clRed;
+    sumInfo1PortObjectsLabelA.Caption := '⚠';
+    sumInfo2PortObjectsLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+    readyToInstall := False;
+    portsInUse := True;
+  end
+  else begin
+    sumInfo1PortObjectsLabelA.Font.Color := clGreen;
+    sumInfo1PortObjectsLabelA.Caption := '✓';
+    sumInfo2PortObjectsLabelA.Caption := Format(CustomMessage('PortAvailable'), [objectsPort]);
+  end;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
+
+  portInfo := getPortInfo(adminPort);
+  if portInfo <> '' then begin
+    explode(portInfoArray, portInfo, ';');
+    sumInfo1PortAdminLabelA.Font.Color := clRed;
+    sumInfo1PortAdminLabelA.Caption := '⚠';
+    sumInfo2PortAdminLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+    readyToInstall := False;
+    portsInUse := True;
+  end
+  else begin
+    sumInfo1PortAdminLabelA.Font.Color := clGreen;
+    sumInfo1PortAdminLabelA.Caption := '✓';
+    sumInfo2PortAdminLabelA.Caption := Format(CustomMessage('PortAvailable'), [adminPort]);
+  end;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure updateSummaryPagePortsB(statesPort: Integer; objectsPort: Integer; adminPort: Integer; var portsInUse: Boolean; maxProgress: Integer; var progress: Integer);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  portInfo: String;
+  portInfoArray: TArrayOfString;
+begin
+  if statesPort <> 9000 then begin
+    portInfo := getPortInfo(statesPort);
+    if portinfo <> '' then begin
+      explode(portInfoArray, portInfo, ';');
+      sumInfo1PortStatesLabelB.Font.Color := clRed;
+      sumInfo1PortStatesLabelB.Caption := '⚠';
+      sumInfo2PortStatesLabelB.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      readyToInstall := False;
+      portsInUse := True;
+    end
+    else begin
+      sumInfo1PortStatesLabelB.Font.Color := clGreen;
+      sumInfo1PortStatesLabelB.Caption := '✓';
+      sumInfo2PortStatesLabelB.Caption := Format(CustomMessage('PortAvailable'), [statesPort]);
+    end;
+  end
+  else begin
+      sumInfo1PortStatesLabelB.Caption := '';
+      sumInfo2PortStatesLabelB.Caption := '';
+  end;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
+
+  if objectsPort <> 9001 then begin
+    portInfo := getPortInfo(objectsPort);
+    if portInfo <> '' then begin
+      explode(portInfoArray, portInfo, ';');
+      sumInfo1PortObjectsLabelB.Font.Color := clRed;
+      sumInfo1PortObjectsLabelB.Caption := '⚠';
+      sumInfo2PortObjectsLabelB.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      readyToInstall := False;
+      portsInUse := True;
+    end
+    else begin
+      sumInfo1PortObjectsLabelB.Font.Color := clGreen;
+      sumInfo1PortObjectsLabelB.Caption := '✓';
+      sumInfo2PortObjectsLabelB.Caption := Format(CustomMessage('PortAvailable'), [objectsPort]);
+    end;
+  end
+  else begin
+      sumInfo1PortObjectsLabelB.Caption := '';
+      sumInfo2PortObjectsLabelB.Caption := '';
+  end;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
+
+  if adminPort <> 8081 then begin
+    portInfo := getPortInfo(adminPort);
+    if portInfo <> '' then begin
+      explode(portInfoArray, portInfo, ';');
+      sumInfo1PortAdminLabelB.Font.Color := clRed;
+      sumInfo1PortAdminLabelB.Caption := '⚠';
+      sumInfo2PortAdminLabelB.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      readyToInstall := False;
+      portsInUse := True;
+    end
+    else begin
+      sumInfo1PortAdminLabelB.Font.Color := clGreen;
+      sumInfo1PortAdminLabelB.Caption := '✓';
+      sumInfo2PortAdminLabelB.Caption := Format(CustomMessage('PortAvailable'), [adminPort]);
+    end;
+  end
+  else begin
+      sumInfo1PortAdminLabelB.Caption := '';
+      sumInfo2PortAdminLabelB.Caption := '';
+  end;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure updateSummaryPage;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
   maxProgress: Integer;
   progress: Integer;
   iobRunning: Boolean;
@@ -580,140 +1254,107 @@ begin
   summaryText := '';
   portsInUse := False;
   readyToInstall := True;
-  maxProgress := 8;
+  maxProgress := 12;
   progress := 0;
 
   tryStopServiceAtNextRetry := False;
 
-  iobServiceExists := (execAndReturnOutput('sc GetDisplayName ' + iobServiceName + ' | find /C "ioBroker"', False) = '1');
-
-  progressPage.SetProgress(progress, maxProgress); progress := progress +1;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
   progressPage.Show
   progressPage.SetText(CustomMessage('GatherInformation'), 'Node.js');
   gatherInstNodeData;
 
-  progressPage.SetProgress(progress, maxProgress); progress := progress +1;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
   progressPage.SetText(CustomMessage('GatherInformation'), 'ioBroker');
   iobInstalled := gatherIoBrokerInfo;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
+  gatherIobPortsAndServername(appInstPath, iobStatesPort, iobObjectsPort, iobAdminPort, iobServerName);
 
-  progressPage.SetProgress(progress, maxProgress); progress := progress +1;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
   iobRunning := gatherIoBrokerStatus;
 
-  progressPage.SetProgress(progress, maxProgress); progress := progress +1;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
   progressPage.SetText(CustomMessage('GatherInformation'), CustomMessage('RecommendenNodeVersion'));
   gatherNodeData;
 
-  progressPage.SetProgress(progress, maxProgress); progress := progress +1;
+  progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
   progressPage.SetText(CustomMessage('GatherInformation'), CustomMessage('RequiredPorts'));
 
-  ExtractTemporaryFiles('{tmp}\port.bat');
-
   if instNodeVersionMajor = 0 then begin
-    info1NodeLabel.Font.Color := clBlue;
-    info1NodeLabel.Caption := '✗';
-    info2NodeLabel.Caption := CustomMessage('NodeNotInstalled');
+    sumInfo1NodeLabel.Font.Color := clBlue;
+    sumInfo1NodeLabel.Caption := '✗';
+    sumInfo2NodeLabel.Caption := CustomMessage('NodeNotInstalled');
   end
   else begin
     if instNodeVersionMajor = rcmdNodeVersionMajor then begin
-      info1NodeLabel.Font.Color := clGreen;
-      info1NodeLabel.Caption := '✓';
-      info2NodeLabel.Caption := Format(CustomMessage('NodeInstalled'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, nodePath]);
+      sumInfo1NodeLabel.Font.Color := clGreen;
+      sumInfo1NodeLabel.Caption := '✓';
+      sumInfo2NodeLabel.Caption := Format(CustomMessage('NodeInstalled'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, nodePath]);
     end
     else begin
       if isNodeVersionSupported(instNodeVersionMajor) then begin
-        info1NodeLabel.Font.Color := clYellow;
-        info1NodeLabel.Caption := '⚠';
-        info2NodeLabel.Caption := Format(CustomMessage('NodeInstalled'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, nodePath]);
+        sumInfo1NodeLabel.Font.Color := clYellow;
+        sumInfo1NodeLabel.Caption := '⚠';
+        sumInfo2NodeLabel.Caption := Format(CustomMessage('NodeInstalled'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, nodePath]);
       end
       else begin
-        info1NodeLabel.Font.Color := clRed;
-        info1NodeLabel.Caption := '⚠';
-        info2NodeLabel.Caption := Format(CustomMessage('NodeInstalled'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, nodePath]);
+        sumInfo1NodeLabel.Font.Color := clRed;
+        sumInfo1NodeLabel.Caption := '⚠';
+        sumInfo2NodeLabel.Caption := Format(CustomMessage('NodeInstalled'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, nodePath]);
       end;
     end;
   end;
 
-  info3NodeLabel.Caption := Format(CustomMessage('NodeRecommended'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
+  sumInfo3NodeLabel.Caption := Format(CustomMessage('NodeRecommended'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
 
   if iobVersionMajor = 0 then begin
     if iobControllerFoundNoNode then begin
-      info1IoBrokerLabel.Font.Color := clBlue;
-      info1IoBrokerLabel.Caption := '?';
-      info2IoBrokerLabel.Caption := Format(CustomMessage('IoBrokerControllerFoundNoNode'), [appInstPath]);
+      sumInfo1IoBrokerLabel.Font.Color := clBlue;
+      sumInfo1IoBrokerLabel.Caption := '?';
+      sumInfo2IoBrokerLabel.Caption := Format(CustomMessage('IoBrokerControllerFoundNoNode'), [appInstPath]);
     end
     else begin
-      info1IoBrokerLabel.Font.Color := clBlue;
-      info1IoBrokerLabel.Caption := '✗';
-      info2IoBrokerLabel.Caption := Format(CustomMessage('IoBrokerNotInstalled'), [appInstPath]);
+      sumInfo1IoBrokerLabel.Font.Color := clBlue;
+      sumInfo1IoBrokerLabel.Caption := '✗';
+      sumInfo2IoBrokerLabel.Caption := Format(CustomMessage('IoBrokerNotInstalled'), [appInstPath]);
     end
   end
   else begin
-    info1IoBrokerLabel.Font.Color := clGreen;
-    info1IoBrokerLabel.Caption := '✓';
-    info2IoBrokerLabel.Caption := Format(CustomMessage('IoBrokerInstalled'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, appInstPath]);
+    sumInfo1IoBrokerLabel.Font.Color := clGreen;
+    sumInfo1IoBrokerLabel.Caption := '✓';
+    sumInfo2IoBrokerLabel.Caption := Format(CustomMessage('IoBrokerInstalled'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, appInstPath]);
   end;
 
   if iobRunning then begin
-    info1IoBrokerRunLabel.Font.Color := clRed;
-    info1IoBrokerRunLabel.Caption := '⚠';
-    info2IoBrokerRunLabel.Caption := CustomMessage('IoBrokerRunning');
+    sumInfo1IoBrokerRunLabel.Font.Color := clRed;
+    sumInfo1IoBrokerRunLabel.Caption := '⚠';
+    sumInfo2IoBrokerRunLabel.Caption := CustomMessage('IoBrokerRunning') + ' ' + Format(CustomMessage('Service'), [iobServiceName]);
     readyToInstall := False;
   end
   else begin
-    info1IoBrokerRunLabel.Font.Color := clGreen;
-    info1IoBrokerRunLabel.Caption := '✓';
-    info2IoBrokerRunLabel.Caption := CustomMessage('IoBrokerNotRunning');
+    sumInfo1IoBrokerRunLabel.Font.Color := clGreen;
+    sumInfo1IoBrokerRunLabel.Caption := '✓';
+    sumInfo2IoBrokerRunLabel.Caption := CustomMessage('IoBrokerNotRunning') + ' ' + Format(CustomMessage('Service'), [iobServiceName]);
   end;
 
-  portInfo := getPortInfo(9000);
-  if portinfo <> '' then begin
-    explode(portInfoArray, portInfo, ';');
-    info1Port9000Label.Font.Color := clRed;
-    info1Port9000Label.Caption := '⚠';
-    info2Port9000Label.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
-    readyToInstall := False;
-    portsInUse := True;
+  // Check ports, which are in any case necessary for installation:
+  if (iobVersionMajor = 0) and (iobControllerFoundNoNode = False) then begin
+
+    updateSummaryPagePortsA(9000, 9001, 8081, portsInUse, maxProgress, progress);
+    updateSummaryPagePortsB(iobStatesPort, iobObjectsPort, iobAdminPort, portsInUse, maxProgress, progress);
   end
   else begin
-    info1Port9000Label.Font.Color := clGreen;
-    info1Port9000Label.Caption := '✓';
-    info2Port9000Label.Caption := Format(CustomMessage('PortAvailable'), [9000]);
-  end;
-  progressPage.SetProgress(progress, maxProgress); progress := progress +1;
+    // Check used ports if only "fix" is possible (in this case the standard ports above are not relevant)
+    sumInfo1PortStatesLabelB.Caption := '';
+    sumInfo2PortStatesLabelB.Caption := '';
+    sumInfo1PortObjectsLabelB.Caption := '';
+    sumInfo2PortObjectsLabelB.Caption := '';
+    sumInfo1PortAdminLabelB.Caption := '';
+    sumInfo2PortAdminLabelB.Caption := '';
 
-  portInfo := getPortInfo(9001);
-  if portInfo <> '' then begin
-    explode(portInfoArray, portInfo, ';');
-    info1Port9001Label.Font.Color := clRed;
-    info1Port9001Label.Caption := '⚠';
-    info2Port9001Label.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
-    readyToInstall := False;
-    portsInUse := True;
-  end
-  else begin
-    info1Port9001Label.Font.Color := clGreen;
-    info1Port9001Label.Caption := '✓';
-    info2Port9001Label.Caption := Format(CustomMessage('PortAvailable'), [9001]);
+    progressPage.SetProgress(progress, maxProgress); progress := progress +3;
+    updateSummaryPagePortsA(iobStatesPort, iobObjectsPort, iobAdminPort, portsInUse, maxProgress, progress);
   end;
-  progressPage.SetProgress(progress, maxProgress); progress := progress +1;
-
-  portInfo := getPortInfo(8081);
-  if portInfo <> '' then begin
-    explode(portInfoArray, portInfo, ';');
-    info1Port8081Label.Font.Color := clRed;
-    info1Port8081Label.Caption := '⚠';
-    info2Port8081Label.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
-    readyToInstall := False;
-    portsInUse := True;
-  end
-  else begin
-    info1Port8081Label.Font.Color := clGreen;
-    info1Port8081Label.Caption := '✓';
-    info2Port8081Label.Caption := Format(CustomMessage('PortAvailable'), [8081]);
-  end;
-  progressPage.SetProgress(progress, maxProgress); progress := progress +1;
-
-  DeleteFile('{tmp}\port.bat');
 
   if iobRunning then begin
     if portsInUse then begin
@@ -741,7 +1382,7 @@ begin
       else begin
         if iobServiceExists then begin
           if iobInstalled = False then begin
-            summaryText := CustomMessage('warningService');
+            summaryText := Format(CustomMessage('warningService'), [iobServiceName]);
           end
         end
       end;
@@ -749,13 +1390,13 @@ begin
   end;
 
   if readyToInstall then begin
-    retryButton.Hide
+    sumRetryButton.Hide
   end
   else begin
-    retryButton.Show
+    sumRetryButton.Show
   end;
 
-  summaryLabel.Caption := summaryText;
+  sumSummaryLabel.Caption := summaryText;
 
   progressPage.Hide;
 
@@ -765,72 +1406,73 @@ end;
 procedure updateOptionsPage;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
-  additionalHintsLabel.Caption := '';
+  optAdditionalHintsLabel.Caption := '';
+  optDataMigrationCB.Visible := False;
+  optDataMigrationButton.Visible := False;
+  optDataMigrationLabel.Caption := '';
 
   if instNodeVersionMajor = 0 then begin
-    installNodeCB.checked := True;
-    installNodeLabel.Caption := Format(CustomMessage('InstallNodejs'),[rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
-    installNodeCB.Enabled := False;
-    installNodeCB.Enabled := False;
+    optInstallNodeCB.checked := True;
+    optInstallNodeCB.Caption := ' ' + Format(CustomMessage('InstallNodejs'),[rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
+    optInstallNodeCB.Enabled := False;
   end
   else begin
     if instNodeVersionMajor > rcmdNodeVersionMajor then begin
-      installNodeCB.checked := False;
-      installNodeLabel.Caption := Format(CustomMessage('InstallNodejsMajorTooHigh'),[instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
-      installNodeCB.Enabled := False;
-      installNodeCB.Enabled := False;
-      additionalHintsLabel.Caption := CustomMessage('NodejsMajorTooHigh');
+      optInstallNodeCB.checked := False;
+      optInstallNodeCB.Caption := ' ' + Format(CustomMessage('InstallNodejsMajorTooHigh'),[instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
+      optInstallNodeCB.Enabled := False;
+      optAdditionalHintsLabel.Caption := CustomMessage('NodejsMajorTooHigh');
     end
     else begin
       if isNodeVersionSupported(instNodeVersionMajor) = False then begin
-        installNodeCB.checked := True;
-        installNodeLabel.Caption := Format(CustomMessage('InstallNodejsMajorTooLow'),[instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
-        installNodeCB.Enabled := False;
-        installNodeCB.Enabled := False;
-        additionalHintsLabel.Caption := CustomMessage('NodejsMajorTooLow');
+        optInstallNodeCB.checked := True;
+        optInstallNodeCB.Caption := ' ' + Format(CustomMessage('InstallNodejsMajorTooLow'),[instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
+        optInstallNodeCB.Enabled := False;
+        optAdditionalHintsLabel.Caption := CustomMessage('NodejsMajorTooLow');
       end
       else begin
         if (instNodeVersionMajor = rcmdNodeVersionMajor) and (instNodeVersionMinor = rcmdNodeVersionMinor) and (instNodeVersionPatch = rcmdNodeVersionPatch) then begin
-          installNodeCB.checked := False;
-          installNodeLabel.Caption := Format(CustomMessage('InstallNodejsAlreadyInstalled'),[instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
-          installNodeCB.Enabled := True;
-          installNodeCB.Enabled := True;
+          optInstallNodeCB.checked := False;
+          optInstallNodeCB.Caption := ' ' + Format(CustomMessage('InstallNodejsAlreadyInstalled'),[instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
+          optInstallNodeCB.Enabled := True;
         end
         else begin
-          installNodeCB.checked := True;
-          installNodeLabel.Caption := Format(CustomMessage('UpdateNodejs'),[instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
-          installNodeCB.Enabled := True;
-          installNodeCB.Enabled := True;
+          optInstallNodeCB.checked := True;
+          optInstallNodeCB.Caption := ' ' + Format(CustomMessage('UpdateNodejs'),[instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
+          optInstallNodeCB.Enabled := True;
         end
       end
     end;
   end;
 
   if (iobVersionMajor = 0) and (iobControllerFoundNoNode = False) then begin
-    installIoBrokerCB.checked := True;
-    installIoBrokerLabel.Caption := Format(CustomMessage('InstallIoBroker'),[appInstPath]);
-    installIoBrokerCB.Enabled := False;
-    installIoBrokerCB.Enabled := False;
+    optInstallIoBrokerCB.checked := True;
+    optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBroker'),[appInstPath]);
+    optInstallIoBrokerCB.Enabled := False;
 
-    fixIoBrokerCB.checked := False;
-    fixIoBrokerLabel.Caption := Format(CustomMessage('FixIoBroker'),[appInstPath]);
-    fixIoBrokerCB.Enabled := False;
-    fixIoBrokerCB.Enabled := False;
+    optFixIoBrokerCB.checked := False;
+    optFixIoBrokerCB.Caption := ' ' + Format(CustomMessage('FixIoBroker'),[appInstPath]);
+    optFixIoBrokerCB.Enabled := False;
   end
   else begin
-    installIoBrokerCB.checked := False;
-    installIoBrokerLabel.Caption := Format(CustomMessage('InstallIoBrokeralreadyInstalled'),[appInstPath]);
-    installIoBrokerCB.Enabled := False;
-    installIoBrokerCB.Enabled := False;
+    optInstallIoBrokerCB.checked := False;
+    optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBrokeralreadyInstalled'),[appInstPath]);
+    optInstallIoBrokerCB.Enabled := False;
 
-    fixIoBrokerCB.checked := True;
-    fixIoBrokerLabel.Caption := Format(CustomMessage('FixIoBroker'),[appInstPath]);
-    fixIoBrokerCB.Enabled := True;
-    fixIoBrokerCB.Enabled := True;
+    optFixIoBrokerCB.checked := True;
+    optFixIoBrokerCB.Caption := ' ' + Format(CustomMessage('FixIoBroker'),[appInstPath]);
+    optFixIoBrokerCB.Enabled := True;
   end;
 
-  addFirewallRuleCB.checked := installIoBrokerCB.checked;
-  addFirewallRuleLabel.Caption := CustomMessage('AdaptFirewallRule');
+  optAddFirewallRuleCB.checked := optInstallIoBrokerCB.checked;
+  optAddFirewallRuleCB.Caption := ' ' + CustomMessage('AdaptFirewallRule');
+
+  if optInstallIoBrokerCB.Checked then begin
+    optDataMigrationCB.Visible := True;
+    optDataMigrationButton.Visible := True;
+    optDataMigrationButton.Enabled := False;
+  end;
+
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -838,10 +1480,59 @@ procedure updateNextOptionPage(sender: TObject);
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   WizardForm.NextButton.Enabled := True;
-  if (installNodeCB <> nil) and (installNodeCB <> nil) and (installNodeCB <> nil) and (addFirewallRuleCB <> nil) then begin
-    WizardForm.NextButton.Enabled := (installNodeCB.Checked or installIoBrokerCB.Checked or fixIoBrokerCB.Checked or addFirewallRuleCB.Checked);
+  if (optInstallNodeCB <> nil) and (optInstallNodeCB <> nil) and (optInstallNodeCB <> nil) and (optAddFirewallRuleCB <> nil)and (optDataMigrationCB <> nil)  then begin
+    if (optInstallNodeCB.Checked or optInstallIoBrokerCB.Checked or optFixIoBrokerCB.Checked or optAddFirewallRuleCB.Checked or optDataMigrationCB.Checked) then begin
+      if optDataMigrationCB.Checked and (optDataMigrationLabel.Caption = '') then begin
+        WizardForm.NextButton.Enabled := False;
+      end
+      else begin
+        WizardForm.NextButton.Enabled := True;
+      end;
+    end
+    else begin
+      WizardForm.NextButton.Enabled := False;
+    end;
   end;
   WizardForm.Update;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure updateMigrationControls(sender: TObject);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if optDataMigrationCB.Checked then begin
+    optDataMigrationButton.Enabled := True;
+  end
+  else begin
+    optDataMigrationButton.Enabled := False;
+    optDataMigrationLabel.Caption := '';
+  end;
+  updateNextOptionPage(sender);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure selectMigrationFolder(sender: TObject);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var dir: String;
+begin
+  dir := optDataMigrationLabel.Caption;
+  if dir = '' then dir := 'c:\';
+  if BrowseForFolder(CustomMessage('SelectMigrationDir'), dir, False) then begin
+    if FileExists(dir + '\iobroker.json') and FileExists(dir + '\objects.jsonl')  and FileExists(dir + '\states.jsonl') then begin
+      optDataMigrationLabel.Caption := dir;
+    end
+    else begin
+      dir := dir + '\iobroker-data';
+      if FileExists(dir + '\iobroker.json') and FileExists(dir + '\objects.jsonl')  and FileExists(dir + '\states.jsonl') then begin
+        optDataMigrationLabel.Caption := dir;
+      end
+      else begin
+        optDataMigrationLabel.Caption := '';
+        MsgBox(Format(CustomMessage('NoValidMigrationFolder'), [rcmdNodeDownloadPath]), mbError, MB_OK);
+      end;
+    end;
+    updateNextOptionPage(sender);
+  end;
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -849,275 +1540,495 @@ procedure createPages;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   if summaryPage = nil then begin
-    if isUpgrade then begin
-      summaryPage := CreateCustomPage(wpWelcome, 'ioBroker - Automate your life', '');
+    if isFirstInstallerRun then begin
+      expertOptionsPage := CreateCustomPage(wpSelectDir, CustomMessage('ExpertMode'), CustomMessage('ExpertOptionsCaption'));
     end
     else begin
-      summaryPage := CreateCustomPage(wpSelectDir, 'ioBroker - Automate your life', '');
+      expertOptionsPage := CreateCustomPage(wpWelcome, CustomMessage('ExpertMode'), CustomMessage('ExpertOptionsCaption'));
     end;
 
+    expertSettingsPage := CreateCustomPage(expertOptionsPage.ID, CustomMessage('ExpertMode'), '');
+    summaryPage := CreateCustomPage(expertSettingsPage.ID, 'ioBroker - Automate your life', '');
     optionsPage := CreateCustomPage(summaryPage.ID, 'ioBroker - Automate your life', '');
 
-    info1NodeLabel := TLabel.Create(WizardForm);
-    info1NodeLabel.Parent := summaryPage.Surface;
-    info1NodeLabel.Left := ScaleX(8);
-    info1NodeLabel.Top := ScaleY(2);
-    info1NodeLabel.Width := ScaleX(12);
-    info1NodeLabel.Height := ScaleX(12);
-    info1NodeLabel.Font.Style := [fsBold];
-
-    info2NodeLabel := TLabel.Create(WizardForm);
-    info2NodeLabel.Parent := summaryPage.Surface;
-    info2NodeLabel.Left := ScaleX(22);
-    info2NodeLabel.Top := ScaleY(2);
-    info2NodeLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    info2NodeLabel.Height := ScaleY(16);
-
-    info3NodeLabel := TLabel.Create(WizardForm);
-    info3NodeLabel.Parent := summaryPage.Surface;
-    info3NodeLabel.Left := ScaleX(22);
-    info3NodeLabel.Top := info1NodeLabel.Top + info1NodeLabel.Height + ScaleY(4);
-    info3NodeLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    info3NodeLabel.Height := ScaleY(16);
-
-
-    info1IoBrokerLabel := TLabel.Create(WizardForm);
-    info1IoBrokerLabel.Parent := summaryPage.Surface;
-    info1IoBrokerLabel.Left := ScaleX(8);
-    info1IoBrokerLabel.Top := info3NodeLabel.Top + info1NodeLabel.Height + ScaleY(12);
-    info1IoBrokerLabel.Width := ScaleX(12);
-    info1IoBrokerLabel.Height := ScaleY(12);
-    info1IoBrokerLabel.Font.Style := [fsBold];
-
-    info2IoBrokerLabel := TLabel.Create(WizardForm);
-    info2IoBrokerLabel.Parent := summaryPage.Surface;
-    info2IoBrokerLabel.Left := ScaleX(22);
-    info2IoBrokerLabel.Top := info3NodeLabel.Top + info1NodeLabel.Height + ScaleY(12);
-    info2IoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    info2IoBrokerLabel.Height := ScaleY(12);
-
-
-    info1IoBrokerRunLabel := TLabel.Create(WizardForm);
-    info1IoBrokerRunLabel.Parent := summaryPage.Surface;
-    info1IoBrokerRunLabel.Left := ScaleX(8);
-    info1IoBrokerRunLabel.Top := info1IoBrokerLabel.Top + info1IoBrokerLabel.Height + ScaleY(4);
-    info1IoBrokerRunLabel.Width := ScaleX(12);
-    info1IoBrokerRunLabel.Height := ScaleY(12);
-    info1IoBrokerRunLabel.Font.Style := [fsBold];
-
-    info2IoBrokerRunLabel := TLabel.Create(WizardForm);
-    info2IoBrokerRunLabel.Parent := summaryPage.Surface;
-    info2IoBrokerRunLabel.Left := ScaleX(22);
-    info2IoBrokerRunLabel.Top := info1IoBrokerLabel.Top + info1IoBrokerLabel.Height + ScaleY(4);
-    info2IoBrokerRunLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    info2IoBrokerRunLabel.Height := ScaleY(12);
-
-
-    info1Port9000Label := TLabel.Create(WizardForm);
-    info1Port9000Label.Parent := summaryPage.Surface;
-    info1Port9000Label.Left := ScaleX(8);
-    info1Port9000Label.Top := info2IoBrokerRunLabel.Top + info2IoBrokerRunLabel.Height + ScaleY(12);
-    info1Port9000Label.Width := ScaleX(12);
-    info1Port9000Label.Height := ScaleY(12);
-    info1Port9000Label.Font.Style := [fsBold];
-
-    info2Port9000Label := TLabel.Create(WizardForm);
-    info2Port9000Label.Parent := summaryPage.Surface;
-    info2Port9000Label.Left := ScaleX(22);
-    info2Port9000Label.Top := info2IoBrokerRunLabel.Top + info2IoBrokerRunLabel.Height + ScaleY(12);
-    info2Port9000Label.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    info2Port9000Label.Height := ScaleY(12);
-
-
-    info1Port9001Label := TLabel.Create(WizardForm);
-    info1Port9001Label.Parent := summaryPage.Surface;
-    info1Port9001Label.Left := ScaleX(8);
-    info1Port9001Label.Top := info1Port9000Label.Top + info1Port9000Label.Height + ScaleY(4);
-    info1Port9001Label.Width := ScaleX(12);
-    info1Port9001Label.Height := ScaleY(12);
-    info1Port9001Label.Font.Style := [fsBold];
-
-    info2Port9001Label := TLabel.Create(WizardForm);
-    info2Port9001Label.Parent := summaryPage.Surface;
-    info2Port9001Label.Left := ScaleX(22);
-    info2Port9001Label.Top := info1Port9000Label.Top + info1Port9000Label.Height + ScaleY(4);
-    info2Port9001Label.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    info2Port9001Label.Height := ScaleY(12);
-
-
-    info1Port8081Label := TLabel.Create(WizardForm);
-    info1Port8081Label.Parent := summaryPage.Surface;
-    info1Port8081Label.Left := ScaleX(8);
-    info1Port8081Label.Top := info1Port9001Label.Top + info1Port9001Label.Height + ScaleY(4);
-    info1Port8081Label.Width := ScaleX(12);
-    info1Port8081Label.Height := ScaleY(12);
-    info1Port8081Label.Font.Style := [fsBold];
-
-    info2Port8081Label := TLabel.Create(WizardForm);
-    info2Port8081Label.Parent := summaryPage.Surface;
-    info2Port8081Label.Left := ScaleX(22);
-    info2Port8081Label.Top := info1Port9001Label.Top + info1Port9001Label.Height + ScaleY(4);
-    info2Port8081Label.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    info2Port8081Label.Height := ScaleY(12);
-
-    summaryLabel := TLabel.Create(WizardForm);
-    summaryLabel.Parent := summaryPage.Surface;
-    summaryLabel.Top := info1Port8081Label.Top + info1Port8081Label.Height + ScaleY(10);
-    summaryLabel.Width := summaryPage.SurfaceWidth - ScaleX(4);
-    summaryLabel.Height := ScaleY(80);
-    summaryLabel.AutoSize := False;
-    summaryLabel.Wordwrap := True;
-
-    retryButton := TButton.Create(WizardForm);
-    retryButton.Parent := summaryPage.Surface;
-    retryButton.Top := summaryLabel.Top + summaryLabel.Height + ScaleY(4);
-    retryButton.Width := ScaleX(100);
-    retryButton.Height := ScaleY(30);
-    retryButton.Caption := CustomMessage('CheckAgain');
-    retryButton.OnClick := @retryTestReady;
-
-
-    installNodeCB := TCheckBox.Create(WizardForm);
-    installNodeCB.Parent := optionsPage.Surface;
-    installNodeCB.Left := ScaleX(8);
-    installNodeCB.Top := ScaleY(2);
-    installNodeCB.Width := ScaleX(12);
-    installNodeCB.Height := ScaleX(12);
-    installNodeCB.OnClick := @updateNextOptionPage;
-
-    installNodeLabel := TLabel.Create(WizardForm);
-    installNodeLabel.Parent := optionsPage.Surface;
-    installNodeLabel.Left := ScaleX(28);
-    installNodeLabel.Top := ScaleY(2);
-    installNodeLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    installNodeLabel.Height := ScaleY(16);
-
-    installIoBrokerCB := TCheckBox.Create(WizardForm);
-    installIoBrokerCB.Parent := optionsPage.Surface;
-    installIoBrokerCB.Left := ScaleX(8);
-    installIoBrokerCB.Top := installNodeCB.Top + installNodeCB.Height + ScaleY(10);
-    installIoBrokerCB.Width := ScaleX(12);
-    installIoBrokerCB.Height := ScaleX(12);
-    installIoBrokerCB.OnClick := @updateNextOptionPage;
-
-    installIoBrokerLabel := TLabel.Create(WizardForm);
-    installIoBrokerLabel.Parent := optionsPage.Surface;
-    installIoBrokerLabel.Left := ScaleX(28);
-    installIoBrokerLabel.Top := installNodeCB.Top + installNodeCB.Height + ScaleY(10);
-    installIoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    installIoBrokerLabel.Height := ScaleY(16);
-
-    fixIoBrokerCB := TCheckBox.Create(WizardForm);
-    fixIoBrokerCB.Parent := optionsPage.Surface;
-    fixIoBrokerCB.Left := ScaleX(8);
-    fixIoBrokerCB.Top := installIoBrokerCB.Top + installIoBrokerCB.Height + ScaleY(10);
-    fixIoBrokerCB.Width := ScaleX(12);
-    fixIoBrokerCB.Height := ScaleX(12);
-    fixIoBrokerCB.OnClick := @updateNextOptionPage;
-
-    fixIoBrokerLabel := TLabel.Create(WizardForm);
-    fixIoBrokerLabel.Parent := optionsPage.Surface;
-    fixIoBrokerLabel.Left := ScaleX(28);
-    fixIoBrokerLabel.Top := installIoBrokerCB.Top + installIoBrokerCB.Height + ScaleY(10);
-    fixIoBrokerLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    fixIoBrokerLabel.Height := ScaleY(16);
-
-    addFirewallRuleCB := TCheckBox.Create(WizardForm);
-    addFirewallRuleCB.Parent := optionsPage.Surface;
-    addFirewallRuleCB.Left := ScaleX(8);
-    addFirewallRuleCB.Top := fixIoBrokerCB.Top + fixIoBrokerCB.Height + ScaleY(10);
-    addFirewallRuleCB.Width := ScaleX(12); 
-    addFirewallRuleCB.Height := ScaleX(12);
-    addFirewallRuleCB.OnClick := @updateNextOptionPage;
-    addFirewallRuleLabel := TLabel.Create(WizardForm);
-    addFirewallRuleLabel.Parent := optionsPage.Surface;
-    addFirewallRuleLabel.Left := ScaleX(28);
-    addFirewallRuleLabel.Top := fixIoBrokerCB.Top + fixIoBrokerCB.Height + ScaleY(10);
-    addFirewallRuleLabel.Width := summaryPage.SurfaceWidth - ScaleX(22);
-    addFirewallRuleLabel.Height := ScaleY(16);
-    additionalHintsLabel := TLabel.Create(WizardForm);
-    additionalHintsLabel.Parent := optionsPage.Surface;
-    additionalHintsLabel.Top := addFirewallRuleCB.Top + addFirewallRuleCB.Height + ScaleY(10);
-    additionalHintsLabel.Width := summaryPage.SurfaceWidth - ScaleX(4);
-    additionalHintsLabel.Height := ScaleY(80);
-    additionalHintsLabel.AutoSize := False;
-    additionalHintsLabel.Wordwrap := True;
-
-  end;
-end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function NextButtonClick(CurPageID: Integer): Boolean;
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-begin
-
-  if (CurPageID = wpSelectDir) or ((CurPageID = wpWelcome) and isUpgrade) then begin
-
-    iobServiceName := 'iobroker.exe';
-    iobServiceExists := False;
-
-    if CurPageID = wpSelectDir then begin
-      appInstPath := ExpandConstant('{app}');
+    // Controls summary page -----------------------------------------------------------------------------------
+    sumInfo1NodeLabel := TLabel.Create(WizardForm);
+    with sumInfo1NodeLabel do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(8);
+      Top := 0;
+      Width := ScaleX(12);
+      Height := ScaleX(12);
+      Font.Style := [fsBold];
     end;
-    updateSummaryPage;
-  end;
 
-  if (summaryPage <> nil) and (CurPageID = summaryPage.ID) then begin
-    updateOptionsPage;
-  end;
-
-  Result := True;
- end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-procedure retryTestReady(sender: TObject);
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-var
-  i: Integer;
-  output: String;
-begin
-  if tryStopServiceAtNextRetry then begin
-    progressPage.SetProgress(0,5);
-    progressPage.SetText('', CustomMessage('TryStopIoB'));
-    progressPage.Show;
-    output := execAndReturnOutput('sc stop ' + iobServiceName, False);
-    Log('Stop Service: ' + output);
-    // Wait to ensure ioBroker is really down
-    for i := 0 to 20 do begin
-      Sleep(500);
-      progressPage.SetProgress(i,20);
+    sumInfo2NodeLabel := TLabel.Create(WizardForm);
+    with sumInfo2NodeLabel do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := 0;
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(16);
     end;
-    progressPage.Hide;
+
+    sumInfo3NodeLabel := TLabel.Create(WizardForm);
+    with sumInfo3NodeLabel do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo1NodeLabel.Top + sumInfo1NodeLabel.Height + ScaleY(4);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(16);
+    end;
+
+    sumInfo1IoBrokerLabel := TLabel.Create(WizardForm);
+    with sumInfo1IoBrokerLabel do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(8);
+      Top := sumInfo3NodeLabel.Top + sumInfo1NodeLabel.Height + ScaleY(12);
+      Width := ScaleX(12);
+      Height := ScaleY(12);
+      Font.Style := [fsBold];
+    end;
+
+    sumInfo2IoBrokerLabel := TLabel.Create(WizardForm);
+    with sumInfo2IoBrokerLabel do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo3NodeLabel.Top + sumInfo1NodeLabel.Height + ScaleY(12);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(12);
+    end;
+
+    sumInfo1IoBrokerRunLabel := TLabel.Create(WizardForm);
+    with sumInfo1IoBrokerRunLabel do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(8);
+      Top := sumInfo1IoBrokerLabel.Top + sumInfo1IoBrokerLabel.Height + ScaleY(4);
+      Width := ScaleX(12);
+      Height := ScaleY(12);
+      Font.Style := [fsBold];
+    end;
+
+    sumInfo2IoBrokerRunLabel := TLabel.Create(WizardForm);
+    with sumInfo2IoBrokerRunLabel do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo1IoBrokerLabel.Top + sumInfo1IoBrokerLabel.Height + ScaleY(4);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(12);
+    end;
+
+    sumInfo1PortStatesLabelA := TLabel.Create(WizardForm);
+    with sumInfo1PortStatesLabelA do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(8);
+      Top := sumInfo2IoBrokerRunLabel.Top + sumInfo2IoBrokerRunLabel.Height + ScaleY(12);
+      Width := ScaleX(12);
+      Height := ScaleY(12);
+      Font.Style := [fsBold];
+    end;
+
+    sumInfo2PortStatesLabelA := TLabel.Create(WizardForm);
+    with sumInfo2PortStatesLabelA do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo2IoBrokerRunLabel.Top + sumInfo2IoBrokerRunLabel.Height + ScaleY(12);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(12);
+    end;
+
+    sumInfo1PortObjectsLabelA := TLabel.Create(WizardForm);
+    with sumInfo1PortObjectsLabelA do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(8);
+      Top := sumInfo1PortStatesLabelA.Top + sumInfo1PortStatesLabelA.Height + ScaleY(4);
+      Width := ScaleX(12);
+      Height := ScaleY(12);
+      Font.Style := [fsBold];
+    end;
+
+    sumInfo2PortObjectsLabelA := TLabel.Create(WizardForm);
+    with sumInfo2PortObjectsLabelA do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo1PortStatesLabelA.Top + sumInfo1PortStatesLabelA.Height + ScaleY(4);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(12);
+    end;
+
+    sumInfo1PortAdminLabelA := TLabel.Create(WizardForm);
+    with sumInfo1PortAdminLabelA do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(8);
+      Top := sumInfo1PortObjectsLabelA.Top + sumInfo1PortObjectsLabelA.Height + ScaleY(4);
+      Width := ScaleX(12);
+      Height := ScaleY(12);
+      Font.Style := [fsBold];
+    end;
+
+    sumInfo2PortAdminLabelA := TLabel.Create(WizardForm);
+    with sumInfo2PortAdminLabelA do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo1PortObjectsLabelA.Top + sumInfo1PortObjectsLabelA.Height + ScaleY(4);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(12);
+    end;
+
+    sumInfo1PortStatesLabelB := TLabel.Create(WizardForm);
+    with sumInfo1PortStatesLabelB do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(8);
+      Top := sumInfo1PortAdminLabelA.Top + sumInfo1PortAdminLabelA.Height + ScaleY(4);
+      Width := ScaleX(12);
+      Height := ScaleY(12);
+      Font.Style := [fsBold];
+    end;
+
+    sumInfo2PortStatesLabelB := TLabel.Create(WizardForm);
+    with sumInfo2PortStatesLabelB do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo1PortAdminLabelA.Top + sumInfo1PortAdminLabelA.Height + ScaleY(4);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(12);
+    end;
+
+    sumInfo1PortObjectsLabelB := TLabel.Create(WizardForm);
+    with sumInfo1PortObjectsLabelB do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(8);
+      Top := sumInfo1PortStatesLabelB.Top + sumInfo1PortStatesLabelB.Height + ScaleY(4);
+      Width := ScaleX(12);
+      Height := ScaleY(12);
+      Font.Style := [fsBold];
+    end;
+
+    sumInfo2PortObjectsLabelB := TLabel.Create(WizardForm);
+    with sumInfo2PortObjectsLabelB do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo1PortStatesLabelB.Top + sumInfo1PortStatesLabelB.Height + ScaleY(4);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(12);
+    end;
+
+    sumInfo1PortAdminLabelB := TLabel.Create(WizardForm);
+    with sumInfo1PortAdminLabelB do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(8);
+      Top := sumInfo1PortObjectsLabelB.Top + sumInfo1PortObjectsLabelB.Height + ScaleY(4);
+      Width := ScaleX(12);
+      Height := ScaleY(12);
+      Font.Style := [fsBold];
+    end;
+
+    sumInfo2PortAdminLabelB := TLabel.Create(WizardForm);
+    with sumInfo2PortAdminLabelB do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo1PortObjectsLabelB.Top + sumInfo1PortObjectsLabelB.Height + ScaleY(4);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(12);
+    end;
+
+    sumSummaryLabel := TLabel.Create(WizardForm);
+    with sumSummaryLabel do begin
+      Parent := summaryPage.Surface;
+      Top := sumInfo1PortAdminLabelB.Top + sumInfo1PortAdminLabelB.Height + ScaleY(10);
+      Width := summaryPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleY(75);
+      AutoSize := False;
+      Wordwrap := True;
+    end;
+
+    sumRetryButton := TButton.Create(WizardForm);
+    with sumRetryButton do begin
+      Parent := summaryPage.Surface;
+      Top := sumSummaryLabel.Top + sumSummaryLabel.Height + ScaleY(2);
+      Width := ScaleX(100);
+      Height := ScaleY(30);
+      Caption := CustomMessage('CheckAgain');
+      OnClick := @retryTestReady;
+    end;
+
+    // Controls options page -----------------------------------------------------------------------------------
+    optInstallNodeCB := TCheckBox.Create(WizardForm);
+    with optInstallNodeCB do begin
+      Parent := optionsPage.Surface;
+      Left := ScaleX(8);
+      Top := 0;
+      Width := ScaleX(500);
+      Height := ScaleX(16);
+      OnClick := @updateNextOptionPage;
+    end;
+
+    optInstallIoBrokerCB := TCheckBox.Create(WizardForm);
+    with optInstallIoBrokerCB do begin
+      Parent := optionsPage.Surface;
+      Left := ScaleX(8);
+      Top := optInstallNodeCB.Top + optInstallNodeCB.Height + ScaleY(5);
+      Width := ScaleX(500);
+      Height := ScaleX(16);
+      OnClick := @updateNextOptionPage;
+    end;
+
+    optFixIoBrokerCB := TCheckBox.Create(WizardForm);
+    with optFixIoBrokerCB do begin
+      Parent := optionsPage.Surface;
+      Left := ScaleX(8);
+      Top := optInstallIoBrokerCB.Top + optInstallIoBrokerCB.Height + ScaleY(5);
+      Width := ScaleX(500);
+      Height := ScaleX(16);
+      OnClick := @updateNextOptionPage;
+    end;
+
+    optAddFirewallRuleCB := TCheckBox.Create(WizardForm);
+    with optAddFirewallRuleCB do begin
+      Parent := optionsPage.Surface;
+      Left := ScaleX(8);
+      Top := optFixIoBrokerCB.Top + optFixIoBrokerCB.Height + ScaleY(5);
+      Width := ScaleX(500);
+      Height := ScaleX(16);
+      OnClick := @updateNextOptionPage;
+    end;
+
+    optDataMigrationCB := TCheckBox.Create(WizardForm);
+    with optDataMigrationCB do begin
+      Parent := optionsPage.Surface;
+      Left := ScaleX(8);
+      Top := optAddFirewallRuleCB.Top + optAddFirewallRuleCB.Height + ScaleY(5);
+      Width := ScaleX(500);
+      Height := ScaleX(16);
+      OnClick := @updateMigrationControls;
+      Caption := ' ' + CustomMessage('DataMigrationCB');
+    end;
+
+    optDataMigrationButton := TButton.Create(WizardForm);
+    with optDataMigrationButton do begin
+      Parent := optionsPage.Surface;
+      Left := ScaleX(25);
+      Top := optDataMigrationCB.Top + optDataMigrationCB.Height + ScaleY(5);
+      Width := ScaleX(100);
+      Height := ScaleY(30);
+      OnClick := @selectMigrationFolder;
+      Caption := CustomMessage('DataMigrationButton');
+    end;
+
+    optDataMigrationLabel := TLabel.Create(WizardForm);
+    with optDataMigrationLabel do begin
+      Parent := optionsPage.Surface;
+      Left := ScaleX(140);
+      Top := optDataMigrationCB.Top + optDataMigrationCB.Height + ScaleY(12);
+      Width := ScaleX(500);
+      Height := ScaleY(30);
+      OnClick := @selectMigrationFolder;
+      Caption := 'Test Test Test Test Test';
+    end;
+
+    optAdditionalHintsLabel := TLabel.Create(WizardForm);
+    with optAdditionalHintsLabel do begin
+      Parent := optionsPage.Surface;
+      Top := optDataMigrationButton.Top + optDataMigrationButton.Height + ScaleY(5);
+      Width := summaryPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleY(80);
+      AutoSize := False;
+      Wordwrap := True;
+    end;
+
+    // Controls expert options page ----------------------------------------------------------------------------
+    exoIntroLabel := TLabel.Create(WizardForm);
+    with exoIntroLabel do begin
+      Parent := expertOptionsPage.Surface;
+      Top := scaleY(2);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleY(80);
+      AutoSize := False;
+      Wordwrap := True;
+      Caption := CustomMessage('ExpertOptionsIntro');
+    end;
+
+    exoNewServerRB := TRadioButton.Create(WizardForm);
+    with exoNewServerRB do begin
+      Parent := expertOptionsPage.Surface;
+      Top := exoIntroLabel.Top + exoIntroLabel.Height + ScaleY(5);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleX(14);
+      Caption := ' ' + CustomMessage('ExpertNewServer');
+      Checked := True;
+      OnClick := @expertOptionChanged
+    end;
+
+    exoNewServerLabel := TLabel.Create(WizardForm);
+    with exoNewServerLabel do begin
+      Parent := expertOptionsPage.Surface;
+      Top := exoNewServerRB.Top + exoNewServerRB.Height + ScaleY(5);
+      Left := ScaleX(20);
+      Width := expertOptionsPage.SurfaceWidth + ScaleX(20);
+      Height := ScaleY(60);
+      AutoSize := False;
+      Wordwrap := True;
+    end;
+
+    exoMaintainServerRB := TRadioButton.Create(WizardForm);
+    with exoMaintainServerRB do begin
+      Parent := expertOptionsPage.Surface;
+      Top := exoNewServerLabel.Top + exoNewServerLabel.Height + ScaleY(5);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleX(14);
+      Caption := ' ' + CustomMessage('ExpertMaintainServer');
+      OnClick := @expertOptionChanged
+      Enabled := False;
+    end;
+
+    exoMaintainServerCombo := TComboBox.Create(WizardForm);
+    with exoMaintainServerCombo do begin
+      Parent := expertOptionsPage.Surface;
+      Top := exoMaintainServerRB.Top + exoMaintainServerRB.Height + ScaleY(5);
+      Left := ScaleX(20);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleY(30);
+      Style := csDropDownList;
+      Enabled := False;
+      Sorted := False;
+      Font.Name := 'Courier New';
+    end;
+
+    exoUninstallServerRB := TRadioButton.Create(WizardForm);
+    with exoUninstallServerRB do begin
+      Parent := expertOptionsPage.Surface;
+      Top := exoMaintainServerCombo.Top + exoMaintainServerCombo.Height + ScaleY(20);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleX(14);
+      Caption := ' ' + CustomMessage('ExpertUninstallServer');
+      OnClick := @expertOptionChanged
+      Enabled := False;
+    end;
+
+    exoUninstallServerCombo := TComboBox.Create(WizardForm);
+    with exoUninstallServerCombo do begin
+      Parent := expertOptionsPage.Surface;
+      Top := exoUninstallServerRB.Top + exoUninstallServerRB.Height + ScaleY(5);
+      Left := ScaleX(20);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleY(30);
+      Style := csDropDownList;
+      Enabled := False;
+      Sorted := False;
+      Font.Name := 'Courier New';
+    end;
+
+
+    // Controls expert settings page ---------------------------------------------------------------------------
+    exsIntroLabel := TLabel.Create(WizardForm);
+    with exsIntroLabel do begin
+      Parent := expertSettingsPage.Surface;
+      Top := scaleY(2);
+      Width := expertSettingsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleY(60);
+      AutoSize := False;
+      Wordwrap := True;
+    end;
+
+    exsServerNameLabel := TLabel.Create(WizardForm);
+    with exsServerNameLabel do begin
+      Parent := expertSettingsPage.Surface;
+      Top := exsIntroLabel.Top + exsIntroLabel.Height + ScaleY(5);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleX(14);
+      Caption := CustomMessage('ExpertServerName');
+    end;
+
+    exsServerNameEdit := TEdit.Create(WizardForm);
+    with exsServerNameEdit do begin
+      Parent := expertSettingsPage.Surface;
+      Top := exsServerNameLabel.Top + exsServerNameLabel.Height + ScaleY(5);
+      Width := ScaleX(100);
+      Height := ScaleX(14);
+      MaxLength := 15
+      OnKeyPress := @keyPressServerName;
+    end;
+
+    exsStatesPortLabel := TLabel.Create(WizardForm);
+    with exsStatesPortLabel do begin
+      Parent := expertSettingsPage.Surface;
+      Top := exsServerNameEdit.Top + exsServerNameEdit.Height + ScaleY(15);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleX(14);
+      Caption := CustomMessage('ExpertStatesPort');
+    end;
+
+    exsStatesPortEdit := TEdit.Create(WizardForm);
+    with exsStatesPortEdit do begin
+      Parent := expertSettingsPage.Surface;
+      Top := exsStatesPortLabel.Top + exsStatesPortLabel.Height + ScaleY(5);
+      Width := ScaleX(100);
+      Height := ScaleX(14);
+      MaxLength := 5;
+      OnKeyPress := @keyPressStatesPort;
+    end;
+
+    exsObjectsPortLabel := TLabel.Create(WizardForm);
+    with exsObjectsPortLabel do begin
+      Parent := expertSettingsPage.Surface;
+      Top := exsStatesPortEdit.Top + exsStatesPortEdit.Height + ScaleY(15);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleX(14);
+      Caption := CustomMessage('ExpertObjectsPort');
+    end;
+
+    exsObjectsPortEdit := TEdit.Create(WizardForm);
+    with exsObjectsPortEdit do begin
+      Parent := expertSettingsPage.Surface;
+      Top := exsObjectsPortLabel.Top + exsObjectsPortLabel.Height + ScaleY(5);
+      Width := ScaleX(100);
+      Height := ScaleX(14);
+      MaxLength := 5;
+      OnKeyPress := @keyPressObjectsPort;
+    end;
+
+    exsAdminPortLabel := TLabel.Create(WizardForm);
+    with exsAdminPortLabel do begin
+      Parent := expertSettingsPage.Surface;
+      Top := exsObjectsPortEdit.Top + exsObjectsPortEdit.Height + ScaleY(15);
+      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Height := ScaleX(14);
+      Caption := CustomMessage('ExpertAdminPort');
+    end;
+
+    exsAdminPortEdit := TEdit.Create(WizardForm);
+    with exsAdminPortEdit do begin
+      Parent := expertSettingsPage.Surface;
+      Top := exsAdminPortLabel.Top + exsAdminPortLabel.Height + ScaleY(5);
+      Width := ScaleX(100);
+      Height := ScaleX(14);
+      MaxLength := 5;
+      OnKeyPress := @keyPressAdminPort;
+    end;
   end;
-
-  updateSummaryPage;
-
-  WizardForm.NextButton.Enabled := readyToInstall;
-  WizardForm.Update;
-
 end;
 
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-procedure CurPageChanged(CurPageID: Integer);
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-begin
-  if (summaryPage <> nil) and (CurPageId = summaryPage.id) then begin
-    Wizardform.NextButton.Enabled := readyToInstall;
-  end;
-end;
-
+{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ Functions to install/deinstall/change system state
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function downloadNodeJs: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   Result := False;
-  if installNodeCB.Checked = True then begin
+  if optInstallNodeCB.Checked = True then begin
     try
       progressPage.SetProgress(0, 1);
       progressPage.SetText(CustomMessage('DownloadingNodejs'), Format(CustomMessage('DownloadingNodejsVersion'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]));
       progressPage.Show
-      DownloadTemporaryFile(rcmdNodeDownloadPath, 'node.msi', '', @OnDownloadProgressNode);
+      try
+        DownloadTemporaryFile(rcmdNodeDownloadPath, 'node.msi', '', @OnDownloadProgressNode);
+      except
+        Log(GetExceptionMessage);
+        MsgBox(Format(CustomMessage('DownloadErrorNode'), [rcmdNodeDownloadPath]), mbError, MB_OK);
+        Exit;
+      end;
 
       if (FileExists(ExpandConstant('{tmp}') + '\node.msi')) then begin
         Log('Node.js download: Success!');
@@ -1138,39 +2049,18 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function getLogNameNodeJsInstall: String;
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-begin
-  Result := appInstPath + '\log\installNodeJs.log';
-end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function getLogNameIoBrokerInstall: String;
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-begin
-  Result := appInstPath + '\log\installIoBroker.log';
-end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function getLogNameIoBrokerFix: String;
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-begin
-  Result := appInstPath + '\log\installIoBrokerFix.log';
-end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function installNodeJs: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   logText: AnsiString;
 begin
-  if installNodeCB.Checked then begin
+  if optInstallNodeCB.Checked then begin
     Result := False;
     try
       marqueePage.SetText(CustomMessage('InstallingNodejs'), Format(CustomMessage('InstallingNodejsVersion'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]));
       marqueePage.Show
       marqueePage.Animate
-      Result := execAndStoreOutput('msiexec /qn /l* ' + getLogNameNodeJsInstall + ' /i ' + ExpandConstant('{tmp}') + '\node.msi', '', '');
+      Result := execAndStoreOutput('msiexec /qn /l* ' + getLogNameNodeJsInstall + ' /i ' + ExpandConstant('{tmp}') + '\node.msi', '', '', appInstPath);
 
       if LoadStringFromFile(getLogNameNodeJsInstall, logText) then begin
         if Pos('Configuration completed successfully', logText) = 0 then begin
@@ -1197,42 +2087,7 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function checkioBrokerRunning(info: String): Boolean;
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-var
-  iobServiceOK: Boolean;
-  portInfo: String;
-  i: Integer;
-begin
-  Log('ioBroker installation completed!');
-  marqueePage.SetText(info, CustomMessage('WaitForService'));
-  for i := 0 to 15 do begin
-    Sleep(1000);
-    iobServiceOK := isIobServiceRunning;
-    if iobServiceOK then break;
-  end;
-  if iobServiceOK then begin
-    Log('ioBroker service was started!');
-    marqueePage.SetText(info, CustomMessage('WaitForAdmin'));
-    for i := 0 to 1000 do begin
-      portInfo := getPortInfo(8081);
-      if portInfo <> '' then break;
-    end;
-    if portInfo <> '' then begin
-      Log('ioBroker Admin is reachable!');
-      Result := True;
-    end
-    else begin
-      Log('ioBroker Admin is not reachable!');
-    end
-  end
-  else begin
-    Log('ioBroker service was not started!');
-  end;
-end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function installioBroker: Boolean;
+function installIoBroker: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   cmd: String;
@@ -1245,12 +2100,19 @@ begin
   LogName := ''
   info := '';
 
-  if installIoBrokerCB.Checked then begin
+  if expertCB.Checked and exoNewServerRB.Checked then begin
+    ForceDirectories(appInstPath);
+    if (not SaveStringToFile(appInstPath + '\.env', 'iobservicename=' + iobServiceName, false)) then begin
+      MsgBox(CustomMessage('ErrorServiceFile'), mbError, MB_OK);
+      Exit;
+    end;
+  end;
+
+  if optInstallIoBrokerCB.Checked then begin
     if iobServiceExists then begin
       // Service exists, but ioBroker not installed. We remove the Service
-      output := execAndReturnOutput('sc stop ' + iobServiceName, False);
-      Log('Stop Service: ' + output);
-      output := execAndReturnOutput('sc delete ' + iobServiceName, False);
+      stopIobService(iobServiceName, '');
+      output := execAndReturnOutput('sc delete ' + iobServiceName + '.exe', False, '', '');
       Log('Delete Service: ' + output);
     end;
     gatherInstNodeData;
@@ -1259,7 +2121,7 @@ begin
     info := CustomMessage('InstallingIoBroker');
   end
   else begin
-    if fixIoBrokerCB.Checked then begin
+    if optFixIoBrokerCB.Checked then begin
       gatherInstNodeData;
       cmd := '"' + nodePath + '\npx" --yes @iobroker/fix@latest';
       LogName := getLogNameIoBrokerFix
@@ -1272,17 +2134,28 @@ begin
       marqueePage.SetText(info, '');
       marqueePage.Show
       marqueePage.Animate
+
       // ioBroker.bat makes trouble when calling npx@iobroker..., delete it
       // Don't panic, fix will restore it anyway, and install will install it anyway
       DeleteFile(appInstPath + '\iobroker.bat');
-      if execAndStoreOutput(cmd , LogName, nodePath) then begin
+      if execAndStoreOutput(cmd , LogName, nodePath, appInstPath) then begin
         if (FileExists(appInstPath + '\instDone')) then begin
-          Result := checkioBrokerRunning(info);
+          if expertCB.Checked and exoNewServerRB.Checked and optInstallIoBrokerCB.Checked or optDataMigrationCB.Checked then begin
+            Result := reconfigureIoBroker(info, LogName);
+            if not Result then begin
+              MsgBox(CustomMessage('ReconfigureError'), mbError, MB_OK or MB_SETFOREGROUND);
+              Exit;
+            end;
+          end;
+          Log('ioBroker installation/fixing completed!');
+          Result := checkIoBrokerRunning(info);
         end
         else begin
-          Log('ioBroker installation did not run til the end!');
+          Log('ioBroker installation/fixing did not run til the end!');
         end;
-        Log('ioBroker installation was not executed due to unknown error!');
+      end
+      else begin
+        Log('ioBroker installation/fixing was not executed due to unknown error!');
       end;
 
     except
@@ -1297,10 +2170,195 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function ioBrokerNeedsStart: Boolean;
+function stopIobService(serviceName: String; logFileName: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  output: String;
+  i: Integer;
+  pid: Integer;
+begin
+  Result := False;
+  i := 0;
+  pid := 0;
+
+  while i < 15 do begin
+    output := execAndReturnOutput('sc stop ' + serviceName + '.exe', True, '', '');
+    Log('Stop Service: ' + output);
+    if logFileName <> '' then begin
+      SaveStringToFile(logFileName,
+                       '----------------------------------------------' + chr(13) + chr(10) +
+                       'Stop service ' + serviceName + '.exe:' + chr(13) + chr(10) +
+                       output + chr(13) + chr(10), True);
+    end;
+    Sleep(2000);
+    if not isIobServiceRunning(serviceName) then begin
+      Result := True;
+      Exit;
+    end;
+  end;
+
+  if not Result then begin
+    output := execAndReturnOutput('sc queryex ' + serviceName + '.exe | find /i "PID"', True, '', '');
+    pid := StrToIntDef(Trim(Copy(output, pos(':', output) + 1, Length(output))), 0);
+    if pid = 0 then begin
+      Log('No pid found, Service is stopped.');
+      Result := True;
+    end
+    else begin
+      Log(Format('Pid %d found.', [pid]));
+      output := execAndReturnOutput(Format('taskkill /f /t /pid %d', [pid]), True, '', '');
+      Log(Format('taskkill /f /pid %d: ', [pid]) + output);
+      SaveStringToFile(logFileName,
+                       '----------------------------------------------' + chr(13) + chr(10) +
+                       'Killed task of servive ' + serviceName + '.exe:' + chr(13) + chr(10) +
+                       output + chr(13) + chr(10), True);
+      Result := True;
+    end;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure retryTestReady(sender: TObject);
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
-  Result := (installIoBrokerCB.Checked = False) and (fixIoBrokerCB.Checked = False);
+  if tryStopServiceAtNextRetry then begin
+    marqueePage.Animate;
+    marqueePage.SetText('', CustomMessage('TryStopIoB'));
+    marqueePage.Show;
+    stopIobService(iobServiceName, '');
+    marqueePage.Hide;
+  end;
+
+  updateSummaryPage;
+
+  WizardForm.NextButton.Enabled := readyToInstall;
+  WizardForm.Update;
+
+end;
+
+{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ Inno Setup Event Functions
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function NextButtonClick(CurPageID: Integer): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := True;
+
+  if CurPageID = wpSelectDir then begin
+
+    if checkForStabilostickInstallation(ExpandConstant('{app}')) then begin
+      MsgBox(CustomMessage('FolderStabilostick'), mbError, MB_OK or MB_SETFOREGROUND);
+      Result := False;
+      Exit;
+    end;
+
+    iobRootPath := ExpandConstant('{app}');
+    appInstPath := iobRootPath;
+  end;
+
+  // Actions for both, expert and not expert:
+  if (summaryPage <> nil) and (CurPageID = summaryPage.ID) then begin
+    updateOptionsPage;
+  end;
+
+  if not expertCB.Checked then begin
+    // Only not expert:
+    if (CurPageID = wpSelectDir) or
+       ((CurPageID = wpWelcome) and not isFirstInstallerRun)
+    then begin
+      iobServiceName := 'ioBroker';
+      iobServiceExists := False;
+      updateSummaryPage;
+    end;
+  end
+  else begin
+    // Only expert:
+    // Ensure that Node path of existing node installation is set correctly:
+    gatherInstNodeData;
+
+    if (CurPageID = wpSelectDir) or
+       ((CurPageID = wpWelcome) and not isFirstInstallerRun)
+    then begin
+      updateExpertOptonsPage;
+    end;
+    if CurPageID = expertOptionsPage.ID then begin
+      if exoNewServerRB.Checked then begin
+        updateExpertSettingsPage;
+      end
+      else begin
+        if exoMaintainServerRB.Checked then begin
+          appInstPath := Copy(exoMaintainServerCombo.Text, pos('|', exoMaintainServerCombo.Text) + 2, Length(exoMaintainServerCombo.Text));
+          updateSummaryPage;
+        end;
+        if exoUninstallServerRB.Checked then begin
+          appInstPath := Copy(exoUninstallServerCombo.Text, pos('|', exoUninstallServerCombo.Text) + 2, Length(exoUninstallServerCombo.Text));
+          iobServerName := Trim(Copy(exoUninstallServerCombo.Text, 1, pos('|', exoUninstallServerCombo.Text) - 1));
+          try
+            marqueePage.SetText(CustomMessage('GatherInformation'), 'ioBroker');
+            marqueePage.Show
+            marqueePage.Animate
+            iobInstalled := gatherIoBrokerInfo;
+          finally
+            marqueePage.Hide
+          end;
+          // We continue also if no ioBroker was found to cleanup old fragments of an installation
+        end;
+      end;
+    end;
+    if CurPageID = expertSettingsPage.ID then begin
+      Result := checkAndSetExpertSettings;
+      if Result then begin
+        updateSummaryPage;
+      end;
+    end;
+  end;
+ end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure CurPageChanged(CurPageID: Integer);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if (summaryPage <> nil) and (CurPageId = summaryPage.id) then begin
+    Wizardform.NextButton.Enabled := readyToInstall;
+  end;
+
+  expertCB.Enabled := (CurPageId = wpWelcome) and (expertCB.Checked and not expertInstallationExists or not expertCB.Checked);
+  if (CurPageId <> wpWelcome) then begin
+    expertCB.Visible :=  expertCB.Checked;
+  end;
+
+  if CurPageID = wpReady then begin
+    if expertCB.Checked and exoUninstallServerRB.Checked then begin
+      WizardForm.NextButton.Caption := CustomMessage('Uninstall');
+      WizardForm.PageNameLabel.Caption := CustomMessage('ReadyUninstallTitle');;
+      WizardForm.PageDescriptionLabel.Caption := CustomMessage('ReadyUninstallSubTitle');;
+      WizardForm.ReadyLabel.Caption := CustomMessage('ReadyUninstall');
+    end
+    else begin
+      if not optInstallIoBrokerCB.checked then begin
+        WizardForm.NextButton.Caption := CustomMessage('Update');
+        WizardForm.PageNameLabel.Caption := CustomMessage('ReadyMaintainTitle');;
+        WizardForm.PageDescriptionLabel.Caption := CustomMessage('ReadyMaintainSubTitle');
+        WizardForm.ReadyLabel.Caption := CustomMessage('ReadyMaintain');
+      end
+      else begin
+        WizardForm.PageDescriptionLabel.Caption := CustomMessage('ReadyInstallSubTitle');
+        WizardForm.ReadyLabel.Caption := CustomMessage('ReadyInstall');
+      end;
+    end;
+  end;
+
+  if CurPageID = wpFinished then begin
+    WizardForm.FinishedLabel.Caption := CustomMessage('FinishedMessage');
+  end;
+
+  if (CurPageID = wpPreparing) or (CurPageID = wpInstalling) then begin
+    WizardForm.PageNameLabel.Caption := 'ioBroker - Automate your life';
+    WizardForm.PageDescriptionLabel.Caption := '';
+  end;
+
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -1309,153 +2367,233 @@ procedure CurStepChanged(CurStep: TSetupStep);
 var
   output: String;
   cont: Boolean;
-  decision: Integer;
   resultCode: Integer;
 begin
   if CurStep = ssInstall then begin
+    if expertCB.Checked and exoUninstallServerRB.Checked then begin
+      Log('Directory to delete: ' + appInstPath);
+      Log('Registry Key to delete: ' + expertRegRoot + iobServerName);
+      Log('Service to delete: ' + iobServiceName);
 
-    // Be sure that the path for the log files exists
-    ForceDirectories(appInstPath + '\log');
+      // Delete Files
+      try
+        marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('DeleteService'), [iobServiceName]));
+        marqueePage.Show
+        marqueePage.Animate
 
-    // Remove old log files and old semaphore file
-    DeleteFile(getLogNameNodeJsInstall);
-    DeleteFile(getLogNameIoBrokerInstall);
-    DeleteFile(getLogNameIoBrokerFix);
-    DeleteFile(appInstPath + '\instDone');
+        // Stop and remove the service
+        stopIobService(iobServiceName, '');
 
-    cont := True;
+        if nodepath = '' then gatherInstNodeData;
 
-    // Download Node.js
-    if cont then begin
-      if downloadNodeJs = False then begin
-        // Download failed
-        decision := MsgBox(CustomMessage('DownloadFailedNoNodeJs'), mbError, MB_OK or MB_SETFOREGROUND);
-        cont := False;
-      end;
-    end;
+        output := execAndReturnOutput('"' + nodePath + '\node.exe" "' + appInstPath + '\uninstall.js"', True, nodepath, appInstPath);
+        Log('Delete Service: ' + output);
 
-    if cont then begin
-      if installNodeJs = False then begin
-        decision := MsgBox(CustomMessage('InstallationFailedNoNodeJs'), mbError, MB_OK or MB_SETFOREGROUND);
-        Exec('notepad', getLogNameNodeJsInstall, '', SW_SHOWNORMAL, ewNoWait, resultCode);
-        cont := False;
-      end;
-    end;
-
-    if cont then begin
-      if installioBroker = False then begin
-        if installIoBrokerCB.Checked then begin
-          decision := MsgBox(CustomMessage('InstallationFailedIoBroker'), mbError, MB_OK or MB_SETFOREGROUND);
-          Exec('notepad', getLogNameIoBrokerInstall, '', SW_SHOWNORMAL, ewNoWait, resultCode);
-        end
-        else begin
-          decision := MsgBox(CustomMessage('InstallationFailedIoBrokerFix'), mbError, MB_OK or MB_SETFOREGROUND);
-          Exec('notepad', getLogNameIoBrokerFix, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+        // Delete Registry entry
+        if iobServerName <> '' then begin
+          RegDeleteKeyIncludingSubkeys(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName);
         end;
-        cont := False;
-      end;
-    end;
 
-    if (addFirewallRuleCB.checked) then begin
-      output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall delete rule name="Node for ioBroker (inbound)"', True);
-      Log('Remove firewall inbound:' + output);
-      output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall delete rule name="Node for ioBroker (outbound)"', True);
-      Log('Remove firewall outbound:' + output);
-      output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (inbound)" dir=in action=allow program="' + nodePath + '"\node.exe" enable=yes', True);
-      Log('Modify firewall inbound:' + output);
-      output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (outbound)" dir=out action=allow program="' + nodePath + '"\node.exe" enable=yes', True);
-      Log('Modify firewall outbound:' + output);
-    end;
-    if cont then begin
-      if ioBrokerNeedsStart then begin
-        try
-          marqueePage.SetText(CustomMessage('StartIoBroker'), '');
-          marqueePage.Show
-          marqueePage.Animate
-          // In this case ioBroker was not started automatically, restart ioBroker
-        // After installation and fix the service is started anyway
-        output := execAndReturnOutput('sc start ' + iobServiceName, False);
-        Log('Start ioBroker service:' + output);
-          cont := checkioBrokerRunning(CustomMessage('StartIoBroker'));
-        except
+        if UserDefAdminPort then begin
+          DeleteFile(expandConstant('{group}') + '\[' + getIobServiceName('') + '] ioBroker Admin.url');
+          DeleteFile(expandConstant('{group}') + '\[' + getIobServiceName('') + '] ioBroker Admin.lnk');
+        end;
+
+        marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), ['']));
+        DelTree(appInstPath + '\*.js', False, True, False);
+        DelTree(appInstPath + '\*.md', False, True, False);
+        DelTree(appInstPath + '\*.cmd', False, True, False);
+        DelTree(appInstPath + '\*.bat', False, True, False);
+        DelTree(appInstPath + '\*.json', False, True, False);
+        DelTree(appInstPath + '\*.ps1', False, True, False);
+        DelTree(appInstPath + '\*.sh', False, True, False);
+        DeleteFile(appInstPath + '\LICENSE');
+        DeleteFile(appInstPath + '\.env');
+        DeleteFile(appInstPath + '\instDone');
+        marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\daemon']));
+        DelTree(appInstPath + '\daemon', True, True, True);
+        marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\node_modules']));
+        DelTree(appInstPath + '\node_modules', True, True, True);
+        marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\install']));
+        DelTree(appInstPath + '\install', True, True, True);
+        marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\log']));
+        DelTree(appInstPath + '\log', True, True, True);
+        marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\semver']));
+        DelTree(appInstPath + '\semver', True, True, True);
+        marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\iobroker-data_old']));
+        DelTree(appInstPath + '\iobroker-data_old', True, True, True);
+
+        installationSuccessful := True;
+      finally
+        marqueePage.Hide
+      end;
+    end
+    else begin
+      if optDataMigrationCB.Checked then begin
+        MsgBox(CustomMessage('MigrationHints'), mbInformation, MB_OK or MB_SETFOREGROUND);
+      end;
+      // Be sure that the path for the log files exists
+      ForceDirectories(appInstPath + '\log');
+
+      // Remove old log files and old semaphore file
+      DeleteFile(getLogNameNodeJsInstall + '_old');
+      DeleteFile(getLogNameIoBrokerInstall + '_old');
+      DeleteFile(getLogNameIoBrokerFix + '_old');
+      RenameFile(getLogNameNodeJsInstall, getLogNameNodeJsInstall + '_old');
+      RenameFile(getLogNameIoBrokerInstall, getLogNameIoBrokerInstall + '_old');
+      RenameFile(getLogNameIoBrokerFix, getLogNameIoBrokerFix + '_old');
+      DeleteFile(appInstPath + '\instDone');
+
+      cont := True;
+
+      // Download Node.js
+      if cont then begin
+        if downloadNodeJs = False then begin
+          // Download failed
+          MsgBox(CustomMessage('DownloadFailedNoNodeJs'), mbError, MB_OK or MB_SETFOREGROUND);
           cont := False;
-        finally
-          marqueePage.Hide
         end;
       end;
-    end;
 
-    if cont then begin
-      installationSuccessful := True;
+      if cont then begin
+        if installNodeJs = False then begin
+          MsgBox(CustomMessage('InstallationFailedNoNodeJs'), mbError, MB_OK or MB_SETFOREGROUND);
+          Exec('notepad', getLogNameNodeJsInstall, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+          cont := False;
+        end;
+      end;
+
+      if cont then begin
+        if installIoBroker = False then begin
+          if optInstallIoBrokerCB.Checked then begin
+            MsgBox(CustomMessage('InstallationFailedIoBroker'), mbError, MB_OK or MB_SETFOREGROUND);
+            Exec('notepad', getLogNameIoBrokerInstall, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+          end
+          else begin
+            MsgBox(CustomMessage('InstallationFailedIoBrokerFix'), mbError, MB_OK or MB_SETFOREGROUND);
+            Exec('notepad', getLogNameIoBrokerFix, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+          end;
+          cont := False;
+        end;
+      end;
+
+      if (optAddFirewallRuleCB.checked) then begin
+        output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall delete rule name="Node for ioBroker (inbound)"', True, '', '');
+        Log('Remove firewall inbound:' + output);
+        output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall delete rule name="Node for ioBroker (outbound)"', True, '', '');
+        Log('Remove firewall outbound:' + output);
+        output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (inbound)" dir=in action=allow program="' + nodePath + '"\node.exe" enable=yes', True, '', '');
+        Log('Modify firewall inbound:' + output);
+        output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (outbound)" dir=out action=allow program="' + nodePath + '"\node.exe" enable=yes', True, '', '');
+        Log('Modify firewall outbound:' + output);
+      end;
+
+      if cont then begin
+        if ioBrokerNeedsStart then begin
+          try
+            marqueePage.SetText(CustomMessage('StartIoBroker'), '');
+            marqueePage.Show
+            marqueePage.Animate
+
+            // In this case ioBroker was not started automatically, restart ioBroker
+            // After installation and fix the service is started anyway
+            output := execAndReturnOutput('sc start ' + iobServiceName + '.exe', False, '', '');
+            Log('Start ioBroker service:' + output);
+            cont := checkIoBrokerRunning(CustomMessage('StartIoBroker'));
+          except
+            cont := False;
+          finally
+            marqueePage.Hide
+          end;
+        end;
+      end;
+
+      if cont then begin
+        installationSuccessful := True;
+      end;
     end;
   end;
-end;
-
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function success: Boolean;
-{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-begin
-  Result := installationSuccessful;
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
-  Result := Result + 'Node.js:'
-  if installNodeCB.checked then begin
-    if instNodeVersionMajor = 0 then begin
-      Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallNodeJS'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
-    end
-    else begin
-      Result := Result + NewLine + Space + Format(CustomMessage('SummaryUpdateNodeJS'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
-    end
+  if expertCB.Checked and exoUninstallServerRB.Checked then begin
+    Result := 'ioBroker:';
+    Result := Result + NewLine + Space + CustomMessage('SummaryUnInstallIoBroker1');
+    Result := Result + NewLine + NewLine + Space + Space + Format(CustomMessage('SummaryUnInstallIoBroker2'), [appInstPath]);
+    Result := Result + NewLine + Space + Space + Format(CustomMessage('SummaryUnInstallIoBroker3'), [iobServiceName]);
   end
   else begin
-    Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepNodeJS'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch]);
-  end;
-
-  if iobServiceExists then begin
-    if iobInstalled = False then begin
-      if installIoBrokerCB.checked then begin
-        Result := Result + NewLine + NewLine + 'ioBroker Service:';
-        Result := Result + NewLine + Space + Format(CustomMessage('SummaryIoBrokerServiceRemove'), [appInstPath]);
+    Result := Result + 'Node.js:'
+    if optInstallNodeCB.checked then begin
+      if instNodeVersionMajor = 0 then begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallNodeJS'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
+      end
+      else begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryUpdateNodeJS'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
       end
     end
-  end;
+    else begin
+      Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepNodeJS'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch]);
+    end;
 
-  Result := Result + NewLine + NewLine + CustomMessage('SummaryFirewall');
-  if addFirewallRuleCB.checked then begin
-    Result := Result + NewLine + Space + Format(CustomMessage('SummaryChangeFirewall'), [appInstPath]);
-  end
-  else begin
-    Result := Result + NewLine + Space + Format(CustomMessage('SummaryNoChangeFirewall'), [appInstPath]);
-  end;
+    if iobServiceExists then begin
+      if iobInstalled = False then begin
+        if optInstallIoBrokerCB.checked then begin
+          Result := Result + NewLine + NewLine + 'ioBroker Service:';
+          Result := Result + NewLine + Space + Format(CustomMessage('SummaryIoBrokerServiceRemove'), [appInstPath]);
+        end
+      end
+    end;
 
-  Result := Result + NewLine + NewLine + 'ioBroker:';
+    Result := Result + NewLine + NewLine + CustomMessage('SummaryFirewall');
 
-  if installIoBrokerCB.checked then begin
-    Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallIoBroker'), [appInstPath]);
-    Result := Result + NewLine + Space + Format(CustomMessage('SummaryIoBrokerServiceCreate'), [appInstPath]);
-  end
-  else begin
-    if iobversionMajor > 0 then begin
-      Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepIoBroker'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, appInstPath]);
+    if optAddFirewallRuleCB.checked then begin
+      Result := Result + NewLine + Space + Format(CustomMessage('SummaryChangeFirewall'), [appInstPath]);
     end
     else begin
-      Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepIoBrokerProbably'), [appInstPath]);
+      Result := Result + NewLine + Space + Format(CustomMessage('SummaryNoChangeFirewall'), [appInstPath]);
+    end;
+
+    Result := Result + NewLine + NewLine + 'ioBroker:';
+
+    if optInstallIoBrokerCB.checked then begin
+      Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallIoBroker'), [appInstPath]);
+      Result := Result + NewLine + Space + Format(CustomMessage('SummaryIoBrokerServiceCreateDyn'), [iobServiceName]);
     end
+    else begin
+      if iobversionMajor > 0 then begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepIoBroker'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, appInstPath]);
+      end
+      else begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepIoBrokerProbably'), [appInstPath]);
+      end
+    end;
+
+    if optFixIoBrokerCB.checked then begin
+      Result := Result + NewLine + Space + CustomMessage('SummaryExecuteFixer');
+    end;
+
+    Result := Result + NewLine + Space + CustomMessage('SummaryStartioBroker') + ' ' + Format(CustomMessage('Service'), [iobServiceName]);
+
+    if expertCB.Checked and exoNewServerRB.Checked and optInstallIoBrokerCB.Checked or optDataMigrationCB.Checked then begin
+      Result := Result + NewLine + Space + CustomMessage('SummaryShutdownBroker') + ' ' + Format(CustomMessage('Service'), [iobServiceName]);
+      if optDataMigrationCB.Checked then begin
+        Result := Result + NewLine + Space + Format(CustomMessage('CopyMigrationDataFrom'), [optDataMigrationLabel.Caption]);
+      end;
+      if iobServerName <> '' then begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryNewServerName'), [iobServername]);
+      end
+      else begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryNewServerName'), [GetEnv('USERDOMAIN')]);
+      end;
+      Result := Result + NewLine + Space + Format(CustomMessage('SummaryNewStatesObjectsPort'), [iobStatesPort, iobObjectsPort]);
+      Result := Result + NewLine + Space + Format(CustomMessage('SummaryNewAdminPort'), [iobAdminPort]);
+      Result := Result + NewLine + Space + CustomMessage('SummaryStartioBroker') + ' ' + Format(CustomMessage('Service'), [iobServiceName]);
+    end;
   end;
-
-  if fixIoBrokerCB.checked then begin
-    Result := Result + NewLine + Space + CustomMessage('SummaryExecuteFixer');
-  end
-  else begin
-    Result := Result + NewLine + Space + CustomMessage('SummaryNotExecuteFixer');
-  end;
-
-  Result := Result + NewLine + Space + CustomMessage('SummaryStartioBroker');
-
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -1463,10 +2601,10 @@ function ShouldSkipPage(PageID: Integer): Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   Result := False;
-  if isUpgrade then begin
+  if not isFirstInstallerRun then begin
     if (PageID = wpLicense) or
        (PageID = wpSelectDir) then begin
-      Result := true;
+      Result := True;
     end;
   end;
 
@@ -1479,7 +2617,31 @@ begin
      (PageID = wpPreparing) or
      (PageID = wpInstalling)
   then begin
-    Result := true;
+    Result := True;
+  end;
+
+  if not expertCB.Checked then begin
+    if (PageID = expertOptionsPage.ID) or
+       (PageID = expertSettingsPage.ID)
+    then begin
+      Result := True;
+    end;
+  end
+  else begin
+    if exoUninstallServerRB.Checked then begin
+      if (PageID = summaryPage.ID) or
+         (PageID = optionsPage.ID) or
+         (PageID = expertSettingsPage.ID)
+      then begin
+        Result := True;
+      end;
+    end;
+    if exoMaintainServerRB.Checked then begin
+      if PageID = expertSettingsPage.ID
+      then begin
+        Result := True;
+      end;
+    end;
   end;
 end;
 
@@ -1490,10 +2652,34 @@ var
   appId: String;
   appRegKey: String;
   licTxt: String;
-
+  regServerNames: TArrayOfString;
 begin
-  // Display own welcome package
+  ExtractTemporaryFiles('{tmp}\port.bat');
+
+  expertRegRoot := 'Software\ioBroker\Installer\Servers\';
+
+  // Display own welcome page text
   WizardForm.WelcomeLabel2.Caption := CustomMessage('Intro');
+  WizardForm.WizardBitmapImage.OnDblClick := @showExpertMode;
+
+  // Expert Mode checkbox
+  expertCB := TNewCheckBox.Create(WizardForm);
+  expertCB.Parent := WizardForm;
+  expertCB.Top := WizardForm.Height;
+  expertCB.Left := ScaleX(25);
+  expertCB.Width := ScaleX(200);
+  expertCB.Caption := ' ' + CustomMessage('ExpertMode');
+  expertCB.OnClick := @expertModeCBClicked;
+
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+    if GetArrayLength(regServerNames) > 0 then begin
+      expertCB.Checked := True;
+    end;
+  end;
+
+  if not expertCB.Checked then begin
+    expertCB.Visible := False;
+  end;
 
   // Adapt Copyright date in license
   licTxt := WizardForm.LicenseMemo.Text;
@@ -1501,6 +2687,8 @@ begin
   WizardForm.LicenseMemo.Text := licTxt;
   WizardForm.LicenseMemo.Font.Name := 'Courier New';
 
+  // Initialize variables depending on expertMode
+  expertModeCBClicked(nil);
 
   // Check if ioBroker was already installed with this installer
   appId := '{#SetupSetting("AppId")}';
@@ -1509,10 +2697,14 @@ begin
   appRegKey := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + appId + '_is1';
   log(appRegKey);
 
-  if RegKeyExists(HKEY_LOCAL_MACHINE, 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{97DA02F5-2E8C-4B96-BB42-61ED2BBF34DF}_is1' ) then begin
+  if RegKeyExists(HKEY_LOCAL_MACHINE, appRegKey ) then begin
     RegQueryStringValue(HKEY_LOCAL_MACHINE, appRegKey, 'Inno Setup: App Path', appInstPath);
-    isUpgrade := True;
+    isFirstInstallerRun := False;
     Log('ioBroker already installed in '+appInstPath);
+    iobRootPath := appInstPath;
+  end
+  else begin
+    isFirstInstallerRun := True;
   end;
 
   createPages;
@@ -1520,3 +2712,663 @@ begin
   progressPage := CreateOutputProgressPage('ioBroker - Automate your life', '');
   marqueePage := CreateOutputMarqueeProgressPage('ioBroker - Automate your life', '');
 end;
+
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  regServerNames: TArrayOfString;
+  serviceName: String;
+  i: Integer;
+  msg: String;
+begin
+  Result := '';
+  if expertCB.Checked and exoUninstallServerRB.Checked then begin
+    if MsgBox(Format(CustomMessage('ReallyDeleteAndUninstall'), [appInstPath]), mbError, mb_YesNo or MB_SETFOREGROUND) = IDNO then begin
+      Result := CustomMessage('UninstallationCancelled') ;
+    end;
+  end
+  else begin
+    if optInstallNodeCB.Checked then begin
+      // Check if installations in expert mode are running
+      msg := '';
+
+      // First check the default service of a non expert installation:
+      serviceName := getIoBrokerServiceNameFromEnv(iobRootPath);
+      if isIobServiceRunning(serviceName) then begin
+        msg := msg + chr(13) + chr(10) + ' - ' + serviceName;
+      end;
+
+      if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+        for i := 0 to GetArrayLength(regServerNames)-1 do begin
+          if RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'ServiceName', serviceName) then begin
+            if isIobServiceRunning(serviceName) then begin
+              msg := msg + chr(13) + chr(10) + ' - ' + serviceName;
+            end;
+          end;
+        end;
+        if msg <> '' then begin
+          msg :=  chr(13) + chr(10) + msg + chr(13) + chr(10) + chr(13) + chr(10);
+          if MsgBox(Format(CustomMessage('NodeInstallationRunningioBrokerExist'), [msg, chr(13) + chr(10)]), mbError, mb_YESNO or MB_SETFOREGROUND) = IDYES then begin
+            for i := 0 to GetArrayLength(regServerNames)-1 do begin
+              if RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'ServiceName', serviceName) then begin
+                if isIobServiceRunning(serviceName) then begin
+                  stopIobService(serviceName, '');
+                end;
+              end;
+            end;
+          end
+          else begin
+            Result := CustomMessage('NodeInstallationAborted');
+          end;
+        end;
+      end;
+    end;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function InitializeUninstall(): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  regServerNames: TArrayOfString;
+  i: Integer;
+  msg: String;
+begin
+  expertRegRoot := 'Software\ioBroker\Installer\Servers\';
+  Result := True;
+  msg := '';
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+    for i := 0 to GetArrayLength(regServerNames)-1 do begin
+      msg := msg + chr(13) + chr(10) + ' - ' + regServerNames[i];
+    end;
+    if i > 0 then begin
+      msg :=  chr(13) + chr(10) + msg + chr(13) + chr(10) + chr(13) + chr(10);
+      // Inno Setup does not support CustomMessage for unistallation!?
+      // Implemented only German and english
+      if activeLanguage = 'german' then begin
+        MsgBox(Format('ioBroker kann nicht auf diese Weise deinstalliert werden, da im Expertenmodus folgende ioBroker Server installiert wurden:%sBitte starte den Installer und verwende den Expertenmodus, um ioBroker Server Installationen zu deinstallieren.', [msg]), mbError, mb_Ok or MB_SETFOREGROUND);
+      end
+      else begin
+        MsgBox(Format('ioBroker cannot be uninstalled in this way because the following ioBroker servers were installed in expert mode:%sPlease start the installer and use expert mode to uninstall ioBroker server installations.', [msg]), mbError, mb_Ok or MB_SETFOREGROUND);
+      end;
+      Result := False;
+      Exit;
+    end;
+  end;
+end;
+
+{++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ Expert Mode and reconfiguration functions
+ ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure expertModeCBClicked(sender: TObject);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if expertCB.Checked then begin
+    // Will be set later in dialog
+    appInstPath := '';
+    iobStatesPort := 0;
+    iobObjectsPort := 0;
+    iobAdminPort := 0;
+    iobTargetServiceName := '';
+    iobServerName := '';
+    expertCB.Enabled := not expertInstallationExists;
+    if expertCB.Enabled then begin
+      WizardForm.WelcomeLabel2.Caption := CustomMessage('ExpertIntro');
+    end
+    else begin
+      WizardForm.WelcomeLabel2.Caption := CustomMessage('ExpertIntro') + CustomMessage('StandardModeNotAllowed');
+    end;
+  end
+  else begin
+    // Normal mode, i.e. appInstPath points to the one and only installation, the root path
+    appInstPath := iobRootPath;
+    iobStatesPort := 9000;
+    iobObjectsPort := 9001;
+    iobAdminPort := 8081;
+    iobTargetServiceName := 'ioBroker';
+    iobServerName := '';
+    expertCB.Enabled := True;
+    WizardForm.WelcomeLabel2.Caption := CustomMessage('Intro');
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure showExpertMode(sender: TObject);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  expertCB.Visible := True;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function checkAndSetExpertSettings: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := True;
+  if expertCB.Checked and exoNewServerRB.Checked then begin
+    if (exsServerNameEdit.Text <> '') then begin
+      // First character must not be numeric
+      if (exsServerNameEdit.Text[1] >= '0') and (exsServerNameEdit.Text[1] <= '9') then begin
+        WizardForm.ActiveControl := exsServerNameEdit;
+        MsgBox(CustomMessage('ErrorFirstCharacterNumeric'), mbError, MB_OK);
+        Result := False;
+        Exit;
+      end
+      else begin
+        iobServerName := exsServerNameEdit.Text;
+        iobServiceName := 'iob_' + iobServerName;
+        iobTargetServiceName := 'iob_' + iobServerName;
+        appInstPath := iobRootPath + '\_' + iobServiceName;
+      end;
+    end
+    else begin
+      WizardForm.ActiveControl := exsServerNameEdit;
+      MsgBox(CustomMessage('ErrorEmptyString'), mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+
+    Result := checkPort(exsStatesPortEdit, iobStatesPort);
+    if not Result then Exit;
+
+    Result := checkPort(exsObjectsPortEdit, iobObjectsPort);
+    if not Result then Exit;
+
+    Result := checkPort(exsAdminPortEdit, iobAdminPort);
+    if not Result then Exit;
+
+    if (iobStatesPort = iobObjectsPort) or (iobStatesPort = iobAdminPort) then begin
+      WizardForm.ActiveControl := exsStatesPortEdit;
+      MsgBox(CustomMessage('ErrorDuplicatePortNumber'), mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+    if (iobObjectsPort = iobAdminPort) then begin
+      WizardForm.ActiveControl := exsObjectsPortEdit;
+      MsgBox(CustomMessage('ErrorDuplicatePortNumber'), mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+
+    if not isDirectoryEmpty(appInstPath) then begin
+      WizardForm.ActiveControl := exsServerNameEdit;
+      MsgBox(Format(CustomMessage('ErrorDirectoryExists'), [appInstPath]), mbError, MB_OK);
+      Result := False;
+      Exit;
+    end;
+  end
+  else begin
+    Log('Internal Error! Check and Set Expert Settings was called for Maintain or uninstall!');
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure checkNumeric(var Key: char);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if not (Key in [#8,#48,#49,#50,#51,#52,#53,#54,#55,#56,#57]) then Key := #0;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure checkAlphaNumeric(var key: Char);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if not(
+   (Key >= #65) and (Key <= #90) or
+   (Key >= #97) and (Key <= #122))
+  then checkNumeric(Key);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure keyPressServerName(sender: TObject; var key: Char);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  checkAlphaNumeric(key);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure keyPressStatesPort(sender: TObject; var key: Char);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  checkNumeric(key);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure keyPressObjectsPort(sender: TObject; var key: Char);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  checkNumeric(key);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure keyPressAdminPort(sender: TObject; var key: Char);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  checkNumeric(key);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function checkPort(var edit: TEdit; var portNumber: Integer): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  portNumber := StrToIntDef(edit.Text, 0);
+  if (portNumber <= 1023) or (portNumber > 65353) then begin
+    WizardForm.ActiveControl := edit;
+    MsgBox(CustomMessage('ErrorInvalidPortNumber'), mbError, MB_OK);
+    Result := False;
+  end
+  else begin
+    Result := True;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function migrateIoBrokerData(source: String; target: String; logFileName: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  answer: Integer;
+  resultStr: String;
+begin
+  resultStr := '';
+  DelTree(target + '_old', True, True, True);
+  repeat
+    Result := RenameFile(target, target + '_old');
+    if not Result then begin
+      answer := MsgBox(Format(CustomMessage('MigrateDataErrorRename'), [target]), mbError, MB_RETRYCANCEL);
+    end;
+  until Result or (answer = IDCANCEL);
+
+  if Result then begin
+    resultStr := Format('Renamed old folder %s to %s successfully', [target, target + '_old']);
+    repeat
+      Result := directoryCopy(source, target);
+      if not Result then begin
+        answer := MsgBox(Format(CustomMessage('MigrateDataErrorCopy'), [optDataMigrationLabel.Caption, target]), mbError, MB_RETRYCANCEL);
+      end;
+    until Result or (answer = IDCANCEL);
+    if Result then begin
+      resultStr := resultStr + chr(13) + chr(10) + Format('Copied folder %s to %s successfully', [source, target]);
+    end
+    else begin
+      resultStr := resultStr + chr(13) + chr(10) + Format('Error occurred when copying folder %s to %s', [source, target]);
+    end;
+  end
+  else begin
+      resultStr := Format('Error occurred when renaming folder %s to %s', [target, target + '_old']);
+  end;
+  SaveStringToFile(logFileName,
+                   '----------------------------------------------' + chr(13) + chr(10) +
+                   'migrateIoBrokerData:' + chr(13) + chr(10) +
+                   resultStr + chr(13) + chr(10), True);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function reconfigureIoBroker(info: String; logFileName: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  output: String;
+begin
+  Result := True;
+
+  // Stop ioBroker:
+  marqueePage.setText(info, CustomMessage('StoppIob'));
+  Sleep(6000);
+  stopIobService(iobServiceName, logFileName);
+
+  if optDataMigrationCB.Checked then begin
+    marqueePage.setText(info, Format(CustomMessage('MigrateData'), [optDataMigrationLabel.Caption]));
+    migrateIoBrokerData(optDataMigrationLabel.Caption, appInstPath + '\iobroker-data', logFileName);
+  end;
+
+  marqueePage.setText(info, CustomMessage('UpdateAdminPort'));
+  reconfigureIoBrokerAdminPort(iobAdminPort, logFileName);
+
+  marqueePage.setText(info, CustomMessage('UpdateServerName'));
+  reconfigureIoBrokerServerName(iobServername, logFileName);
+
+  marqueePage.setText(info, CustomMessage('UpdateStatesObjectsPort'));
+  reconfigureIoBrokerPorts(iobStatesPort, iobObjectsPort, logFileName);
+
+  Log('Start ioBroker service:' + output);
+  output := execAndReturnOutput('sc start ' + iobServiceName + '.exe', False, '', '');
+
+  if iobServerName <> '' then begin
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'ServerName', iobServerName );
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'ServiceName', iobServiceName );
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'Path', appInstPath );
+    RegWriteDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'StatesPort', iobstatesPort );
+    RegWriteDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'ObjectsPort', iobObjectsPort );
+    RegWriteDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'AdminPort', iobAdminPort );
+  end;
+
+  // We create a new entry if necessary, so remove the old one
+  if UserDefAdminPort then begin
+    DeleteFile(expandConstant('{group}') + '\[' + getIobServiceName('') + '] ioBroker Admin.lnk');
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function expertInstallationExists: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  regServerNames: TArrayOfString;
+begin
+  Result := False;
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+    Result := (GetArrayLength(regServerNames) > 1);
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function reconfigureIoBrokerPorts(statesPort: Integer; objectsPort: Integer; logFileName: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  i: Integer;
+  JsonParser: TJsonParser;
+  jsonString: AnsiString;
+  jsonObject: TJsonObject;
+  jsonPort: TJsonNumber;
+  stringList: TStringList;
+  stringArray: TArrayOfString;
+  resultStr: String;
+begin
+  Result := False;
+  resultStr := '----------------------------------------------' + chr(13) + chr(10) + 'reconfigureIoBrokerPorts:' + chr(13) + chr(10);
+  if FileExists(appInstPath + '\iobroker-data\iobroker.json') then begin
+    LoadStringFromFile(appInstPath + '\iobroker-data\iobroker.json', jsonString);
+    ClearJsonParser(JsonParser);
+    ParseJson(JsonParser, jsonString);
+    if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'states', jsonObject) then begin
+      if FindJsonNumber(JsonParser.Output, jsonObject, 'port', jsonPort) then begin
+        UpdateJsonNumber(JsonParser.Output, jsonObject, 'port', statesPort);
+        Log(Format('Updated states port to %d', [statesPort]));
+        resultStr := resultStr + Format('Updated states port to %d', [statesPort]) + chr(13) + chr(10);
+      end;
+    end;
+    if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'objects', jsonObject) then begin
+      if FindJsonNumber(JsonParser.Output, jsonObject, 'port', jsonPort) then begin
+        UpdateJsonNumber(JsonParser.Output, jsonObject, 'port', objectsPort);
+        Log(Format('Updated objects port to %d', [objectsPort]));
+        resultStr := resultStr + Format('Updated objects port to %d', [objectsPort]) + chr(13) + chr(10);
+      end;
+    end;
+  end;
+
+  stringList := TStringList.Create;
+  try
+    PrintJsonParserOutput(JsonParser.Output, stringList);
+    SetLength(stringArray, stringList.Count);
+    for i := 0 To stringList.Count-1 do begin
+      stringArray[i] := stringList[i];
+    end;
+    FileCopy(appInstPath + '\iobroker-data\iobroker.json', appInstPath + '\iobroker-data\iobroker.json_backup', False);
+    Result := SaveStringsToFile(appInstPath + '\iobroker-data\iobroker.json', stringArray, false);
+    Log('Saved ' + appInstPath + '\iobroker-data\iobroker.json');
+    resultStr := resultStr + 'Saved ' + appInstPath + '\iobroker-data\iobroker.json ' + Format('Result: %d', [Result]) + chr(13) + chr(10);
+  finally
+    stringList.Free;
+  end;
+  SaveStringToFile(logFileName, resultStr, True);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function reconfigureIoBrokerAdminPort(adminPort: Integer; logFileName: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  cmd: String;
+  resultStr: String;
+begin
+  Result := True;
+  cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" set admin.0 --port ' + Format('%d', [adminPort]);
+  Log (cmd);
+  resultStr := execAndReturnOutput(cmd, True, nodePath, appInstPath);
+  Log('reconfigureIoBrokerAdminPort: ' + cmd);
+  Log(resultStr);
+  SaveStringToFile(logFileName,
+                   '----------------------------------------------' + chr(13) + chr(10) +
+                   'reconfigureIoBrokerAdminPort:' + chr(13) + chr(10) +
+                   resultStr + chr(13) + chr(10), True);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function reconfigureIoBrokerServerName(serverName: String; logFileName: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  cmd: String;
+  resultStr: String;
+begin
+  Result := True;
+  if serverName <> '' then begin
+    cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" host set ' + serverName;
+  end else begin
+    cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" host this';
+  end;
+
+  resultStr := execAndReturnOutput(cmd, True, nodePath, appInstPath);
+  Log('reconfigureIoBrokerServerName: ' + cmd);
+  Log(resultStr);
+  SaveStringToFile(logFileName,
+                   '----------------------------------------------' + chr(13) + chr(10) +
+                   'reconfigureIoBrokerServerName:' + chr(13) + chr(10) +
+                   resultStr + chr(13) + chr(10), True);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure updateExpertOptonsPage;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  curInstServiceName: String;
+  statesPort: Integer;
+  objectsPort: Integer;
+  adminPort: Integer;
+  serverName: String;
+  regServerNames: TArrayOfString;
+  regPath: String;
+  i: Integer;
+
+begin
+  exoMaintainServerCombo.Items.Clear;
+  exoUninstallServerCombo.Items.Clear;
+
+  // Check if a "base" installation is existing:
+  if FileExists(iobRootPath + '\node_modules\iobroker.js-controller/iobroker.js')then begin
+    try
+      progressPage.SetText(CustomMessage('GatherInformation'), 'ioBroker');
+      progressPage.Show
+      progressPage.SetProgress(1,2);
+      curInstServiceName := getIoBrokerServiceNameFromEnv(iobRootPath);
+      gatherIobPortsAndServername(iobRootPath, statesPort, objectsPort, adminPort, serverName);
+      exoMaintainServerCombo.Items.add(fillStringWithBlanks(serverName, 16) + ' | ' + iobRootPath);
+      exoUninstallServerCombo.Items.add(fillStringWithBlanks(serverName, 16) + ' | ' + iobRootPath);
+      progressPage.SetProgress(2,2);
+    except
+      Log(GetExceptionMessage);
+    finally
+      progressPage.Hide
+    end;
+    exoNewServerRB.Enabled := False;
+    exoNewServerLabel.Caption := CustomMessage('ExpertNewServerForbiddenDesc');
+    exoUninstallServerRB.Checked := True;
+  end
+  else begin
+    exoNewServerRB.Enabled := True;
+    exoNewServerLabel.Caption := CustomMessage('ExpertNewServerDesc');
+    exoNewServerRB.Checked := True;
+  end;
+
+  // Add servers stored in Registry to comboboxes
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+    for i := 0 to GetArrayLength(regServerNames)-1 do begin
+      if not RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'Path', regPath) then begin
+        regPath := '<unknown>';
+      end;
+      exoMaintainServerCombo.Items.add(fillStringWithBlanks(regServerNames[i], 16) + ' | ' + regPath);
+      exoUninstallServerCombo.Items.add(fillStringWithBlanks(regServerNames[i], 16) + ' | ' + regPath);
+    end;
+  end;
+
+  if exoMaintainServerCombo.Items.Count > 0 then begin
+    exoMaintainServerRB.Enabled := True;
+    exoMaintainServerCombo.ItemIndex := 0;
+  end;
+
+  if exoUninstallServerCombo.Items.Count > 0 then begin
+    exoUninstallServerRB.Enabled := True;
+    exoUninstallServerCombo.ItemIndex := 0;
+  end;
+
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure getPortsAndServerNameForExpertSettingsPage(var statesPort: Integer; var objectsPort: Integer; var adminPort: Integer; var serverName: String);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  regServerNames: TArrayOfString;
+  i: Integer;
+  j: Integer;
+  path: String;
+  sprt: Cardinal;
+  oprt: Cardinal;
+  aprt: Cardinal;
+  done: Boolean;
+  modified: Boolean;
+  srvName: String;
+begin
+  if exoNewServerRB.Checked then begin
+    statesPort := 9010;
+    objectsPort := 9011;
+    adminPort := 8091;
+    serverName := 'SmartHome';
+    // Find most probably free ports not used by an existing iob installation:
+    done := False;
+    modified := True;
+    while not done and modified do begin
+      if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+        if GetArrayLength(regServerNames) > 0 then begin
+          modified := False;
+          for i := 0 to GetArrayLength(regServerNames)-1 do begin
+            RegQueryDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'StatesPort', sprt);
+            RegQueryDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'ObjectsPort', oprt);
+            RegQueryDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'AdminPort', aprt);
+            if (sprt = statesPort) or (sprt = objectsPort) or (sprt = adminPort) or
+               (oprt = statesPort) or (oprt = objectsPort) or (oprt = adminPort) or
+               (aprt = statesPort) or (aprt = objectsPort) or (aprt = adminPort)
+            then begin
+              statesPort := statesPort + 10;
+              objectsPort := objectsPort + 10;
+              adminPort := adminPort + 10;
+              modified := True;
+            end;
+          end;
+        end
+        else begin
+          done := True;
+        end;
+      end
+      else begin
+        done := True;
+      end;
+    end;
+    // Find not used server name:
+    done := False;
+    modified := True;
+    j := 0;
+    while not done and modified do begin
+      j := j + 1;
+      if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+        if GetArrayLength(regServerNames) > 0 then begin
+          modified := False;
+          for i := 0 to GetArrayLength(regServerNames)-1 do begin
+            RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'ServerName', srvName);
+            if srvName = serverName then begin
+              serverName := 'SmartHome' + IntToStr(j);
+              modified := True;
+            end
+          end;
+        end
+        else begin
+          done := True;
+        end;
+      end
+      else begin
+        done := True;
+      end;
+    end;
+  end
+  else begin
+    if exoMaintainServerRB.Checked then begin
+      path := Copy(exoMaintainServerCombo.Text, pos('|', exoMaintainServerCombo.Text) + 2, Length(exoMaintainServerCombo.Text));
+    end
+    else begin
+      path := Copy(exoUninstallServerCombo.Text, pos('|', exoUninstallServerCombo.Text) + 2, Length(exoUninstallServerCombo.Text));
+    end;
+    try
+      progressPage.SetText(CustomMessage('GatherInformation'), 'ioBroker');
+      progressPage.Show
+      progressPage.SetProgress(1,2);
+      gatherIobPortsAndServername(path, statesPort, objectsPort, adminPort, serverName);
+      progressPage.SetProgress(2,2);
+    except
+      Log(GetExceptionMessage);
+    finally
+      progressPage.Hide
+    end;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure updateExpertSettingsPage;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  getPortsAndServerNameForExpertSettingsPage(iobStatesPort, iobObjectsPort, iobAdminPort, iobServerName);
+
+  exsServerNameEdit.Text := iobServerName;
+  exsStatesPortEdit.Text := IntToStr(iobStatesPort);
+  exsObjectsPortEdit.Text := IntToStr(iobObjectsPort);
+  exsAdminPortEdit.Text := IntToStr(iobAdminPort);
+
+  if exoNewServerRB.Checked then begin
+    expertSettingsPage.Description := CustomMessage('ExpertSettingsCaptionNew');
+    exsIntroLabel.Caption := CustomMessage('ExpertSettingsIntroNewServer');
+    exsServerNameEdit.Enabled := True;
+    exsStatesPortEdit.Enabled := True;
+    exsObjectsPortEdit.Enabled := True;
+    exsAdminPortEdit.Enabled := True;
+  end
+  else begin
+    exsServerNameEdit.Enabled := False;
+    exsStatesPortEdit.Enabled := False;
+    exsObjectsPortEdit.Enabled := False;
+    exsAdminPortEdit.Enabled := False;
+    if exoMaintainServerRB.Checked then begin
+      expertSettingsPage.Description := CustomMessage('ExpertSettingsCaptionMaintain');
+      exsIntroLabel.Caption := CustomMessage('ExpertSettingsIntroMaintainServer');
+    end
+    else begin
+      expertSettingsPage.Description := CustomMessage('ExpertSettingsCaptionRemove');
+      exsIntroLabel.Caption := CustomMessage('ExpertSettingsIntroRemoveServer');
+    end;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure expertOptionChanged(sender: TObject);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if exoNewServerRB.Checked then begin
+    exoMaintainServerCombo.Enabled := False;
+    exoUninstallServerCombo.Enabled := False;
+  end;
+  if exoMaintainServerRB.Checked then begin
+    exoMaintainServerCombo.Enabled := True;
+    exoUninstallServerCombo.Enabled := False;
+  end;
+  if exoUninstallServerRB.Checked then begin
+    exoMaintainServerCombo.Enabled := False;
+    exoUninstallServerCombo.Enabled := True;
+  end;
+end;
+
