@@ -1537,13 +1537,13 @@ begin
      (optDataMigrationCB <> nil) and
      (optServiceAutoStartCB <> nil)
   then begin
-    if optInstallNodeCB.Checked or 
+    if optInstallNodeCB.Checked or
        optInstallIoBrokerCB.Checked or
        optFixIoBrokerCB.Checked or
        optDataMigrationCB.Checked or
        (optServiceAutoStartCB.Checked <> isIobServiceAutoStartReg(iobServiceName)) or
        (optAddFirewallRuleCB.Checked <> firewallRuleSet)
-       
+
     then begin
       if optDataMigrationCB.Checked and (optDataMigrationLabel.Caption = '') then begin
         WizardForm.NextButton.Enabled := False;
@@ -3346,7 +3346,7 @@ begin
   end
   else begin
     exoNewServerRB.Enabled := True;
-    exoNewServerLabel.Caption := CustomMessage('ExpertNewServerDesc') + chr(13) + chr(10) + 
+    exoNewServerLabel.Caption := CustomMessage('ExpertNewServerDesc') + chr(13) + chr(10) +
                                  Format(CustomMessage('ExpertNewServerIn'), [iobExpertPath]);
     exoNewServerRB.Checked := True;
   end;
@@ -3587,7 +3587,7 @@ begin
       break;
     end;
   until valid or abort;
-  
+
   if valid then begin
     iobExpertPath := RemoveBackslash(dir);
     RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot, 'RootPath', iobExpertPath );
