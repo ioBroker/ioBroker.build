@@ -14,7 +14,10 @@
 ; - 22.03.2023 Gaspode: Copy the installer itself to ioBroker directory and create shortcut    -
 ; - 25.03.2023 Gaspode: Recognize stabilostick installation folder and abort installation      -
 ; - 26.03.2023 Gaspode: Data migration for new installations implemented                       -
-; - 29.03.2023 Gaspode: Translations completed                                                 -
+; - 01.04.2023 Gaspode: Option added to set windows service startmode (auto, manual)           -
+; - 05.04.2023 Gaspode: Uninstall: keep iobroker-data, but rename it to iobroker-data_backup   -
+; - 08.04.2023 Gaspode: Allow to change the root folder for installations in expert mode       -
+; - 18.04.2023 Gaspode: Fixed firewall rules                                                   -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -171,6 +174,7 @@ var
   optInstallIoBrokerCB: TCheckBox;
   optFixIoBrokerCB: TCheckBox;
   optAddFirewallRuleCB: TCheckBox;
+  optServiceAutoStartCB: TCheckBox;
   optDataMigrationCB: TCheckBox;
   optDataMigrationButton: TButton;
   optDataMigrationLabel: TLabel;
@@ -186,6 +190,7 @@ var
   exoNewServerLabel: TLabel;
   exoMaintainServerCombo: TComboBox;
   exoUninstallServerCombo: TComboBox;
+  exoChangeDirectoryButton: TButton;
 
   // Expert Settings page and controls:
   expertSettingsPage: TWizardPage;
@@ -224,7 +229,8 @@ var
   rcmdNodeVersionPatch: Integer;          // Patch Version of recommended Node.js software
 
 
-  iobRootPath: String;       // Root Path of all ioBroker installations, equal to appInstPath if not expert mode or "basic" iob installation
+  iobHomePath: String;       // Home path of a standard ioBroker installations, equal to appInstPath if not expert mode or standard iob installation
+  iobExpertPath: String;     // Home path where new ioBroker installations are located in expert mode
   appInstPath: String;       // Path to the currently handled iob server installation
   iobServiceName: String;    // The service name of the currently handled iob server installation
   iobObjectsPort: Integer;   // objects port of the currently handled iob server installation
@@ -244,7 +250,7 @@ var
 
   installationSuccessful: Boolean; // True if the installation was successful
 
-  expertRegRoot: String;
+  expertRegServersRoot: String; // Root path in registry for server information (expert mode only)
 
 procedure gatherInstNodeData; forward;
 function reconfigureIoBroker(info: String; logFileName: String): Boolean; forward;
@@ -265,6 +271,7 @@ function stopIobService(serviceName: String; logFileName: String): Boolean; forw
 procedure showExpertMode(sender: TObject); forward;
 procedure expertModeCBClicked(sender: TObject); forward;
 function expertInstallationExists: Boolean; forward;
+procedure expertSelectDirectory(sender: TObject); forward;
 
 {++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  Helper functions for the [xyz] sections of inno setup
@@ -480,7 +487,8 @@ begin
       Dest[i] := Copy(Text, 1, p-1);
       Text := Copy(Text, p + Length(Separator), Length(Text));
       i := i + 1;
-    end else begin
+    end
+    else begin
       Dest[i] := Text;
       Text := '';
     end;
@@ -651,6 +659,30 @@ begin
         FindClose(FindRec);
       end;
     end;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function firewallRuleSet: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  output: String;
+begin
+  Result := False;
+  output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall show rule name="Node for ioBroker (inbound)" | find "Node for ioBroker (inbound)"', False, '', '');
+  if output <> '' then begin
+    Log('Found inbound firewall rule');
+    output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall show rule name="Node for ioBroker (outbound)" | find "Node for ioBroker (outbound)"', False, '', '');
+    if output <> '' then begin
+      Log('Found outbound firewall rule');
+      Result := True;
+    end
+    else begin
+      Log('Outbound firewall rule not found');
+    end;
+  end
+  else begin
+    Log('Inbound firewall rule not found');
   end;
 end;
 
@@ -1105,6 +1137,20 @@ begin
   Result := DirExists(path + '\nodejs');
 end;
 
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function isIobServiceAutoStartReg(serviceName: String): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  serviceStartMode: Cardinal;
+begin
+  result := True;
+  if RegQueryDWordValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Services\' + Lowercase(serviceName) + '.exe', 'Start', ServiceStartMode) then begin
+    if ServiceStartMode <> 2 then begin
+      result := False;
+    end;
+  end;
+end;
+
 {++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  Update page functions
  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
@@ -1409,6 +1455,7 @@ begin
   optAdditionalHintsLabel.Caption := '';
   optDataMigrationCB.Visible := False;
   optDataMigrationButton.Visible := False;
+  optDataMigrationCB.Checked := False;
   optDataMigrationLabel.Caption := '';
 
   if instNodeVersionMajor = 0 then begin
@@ -1464,8 +1511,11 @@ begin
     optFixIoBrokerCB.Enabled := True;
   end;
 
-  optAddFirewallRuleCB.checked := optInstallIoBrokerCB.checked;
+  optAddFirewallRuleCB.Checked := optInstallIoBrokerCB.checked or firewallRuleSet;
   optAddFirewallRuleCB.Caption := ' ' + CustomMessage('AdaptFirewallRule');
+
+  optServiceAutoStartCB.Checked := isIobServiceAutoStartReg(iobServiceName);
+  optServiceAutoStartCB.Caption := ' ' + CustomMessage('ServiceAutostart');
 
   if optInstallIoBrokerCB.Checked then begin
     optDataMigrationCB.Visible := True;
@@ -1480,8 +1530,21 @@ procedure updateNextOptionPage(sender: TObject);
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   WizardForm.NextButton.Enabled := True;
-  if (optInstallNodeCB <> nil) and (optInstallNodeCB <> nil) and (optInstallNodeCB <> nil) and (optAddFirewallRuleCB <> nil)and (optDataMigrationCB <> nil)  then begin
-    if (optInstallNodeCB.Checked or optInstallIoBrokerCB.Checked or optFixIoBrokerCB.Checked or optAddFirewallRuleCB.Checked or optDataMigrationCB.Checked) then begin
+  if (optInstallNodeCB <> nil) and
+     (optInstallNodeCB <> nil) and
+     (optInstallNodeCB <> nil) and
+     (optAddFirewallRuleCB <> nil) and
+     (optDataMigrationCB <> nil) and
+     (optServiceAutoStartCB <> nil)
+  then begin
+    if optInstallNodeCB.Checked or
+       optInstallIoBrokerCB.Checked or
+       optFixIoBrokerCB.Checked or
+       optDataMigrationCB.Checked or
+       (optServiceAutoStartCB.Checked <> isIobServiceAutoStartReg(iobServiceName)) or
+       (optAddFirewallRuleCB.Checked <> firewallRuleSet)
+
+    then begin
       if optDataMigrationCB.Checked and (optDataMigrationLabel.Caption = '') then begin
         WizardForm.NextButton.Enabled := False;
       end
@@ -1490,7 +1553,7 @@ begin
       end;
     end
     else begin
-      WizardForm.NextButton.Enabled := False;
+        WizardForm.NextButton.Enabled := False;
     end;
   end;
   WizardForm.Update;
@@ -1793,11 +1856,21 @@ begin
       OnClick := @updateNextOptionPage;
     end;
 
+    optServiceAutoStartCB := TCheckBox.Create(WizardForm);
+    with optServiceAutoStartCB do begin
+      Parent := optionsPage.Surface;
+      Left := ScaleX(8);
+      Top := optAddFirewallRuleCB.Top + optAddFirewallRuleCB.Height + ScaleY(5);
+      Width := ScaleX(500);
+      Height := ScaleX(16);
+      OnClick := @updateNextOptionPage;
+    end;
+
     optDataMigrationCB := TCheckBox.Create(WizardForm);
     with optDataMigrationCB do begin
       Parent := optionsPage.Surface;
       Left := ScaleX(8);
-      Top := optAddFirewallRuleCB.Top + optAddFirewallRuleCB.Height + ScaleY(5);
+      Top := optServiceAutoStartCB.Top + optServiceAutoStartCB.Height + ScaleY(5);
       Width := ScaleX(500);
       Height := ScaleX(16);
       OnClick := @updateMigrationControls;
@@ -1851,7 +1924,7 @@ begin
     exoNewServerRB := TRadioButton.Create(WizardForm);
     with exoNewServerRB do begin
       Parent := expertOptionsPage.Surface;
-      Top := exoIntroLabel.Top + exoIntroLabel.Height + ScaleY(5);
+      Top := exoIntroLabel.Top + exoIntroLabel.Height + ScaleY(1);
       Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
       Height := ScaleX(14);
       Caption := ' ' + CustomMessage('ExpertNewServer');
@@ -1870,10 +1943,21 @@ begin
       Wordwrap := True;
     end;
 
+    exoChangeDirectoryButton := TButton.Create(WizardForm);
+    with exoChangeDirectoryButton do begin
+      Parent := expertOptionsPage.Surface;
+      Left := ScaleX(20);
+      Top := exoNewServerLabel.Top + exoNewServerLabel.Height + ScaleY(1);
+      Width := ScaleX(250);
+      Height := ScaleY(30);
+      OnClick := @expertSelectDirectory;
+      Caption := CustomMessage('ExpertChangeDirectory');
+    end;
+
     exoMaintainServerRB := TRadioButton.Create(WizardForm);
     with exoMaintainServerRB do begin
       Parent := expertOptionsPage.Surface;
-      Top := exoNewServerLabel.Top + exoNewServerLabel.Height + ScaleY(5);
+      Top := exoChangeDirectoryButton.Top + exoChangeDirectoryButton.Height + ScaleY(15);
       Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
       Height := ScaleX(14);
       Caption := ' ' + CustomMessage('ExpertMaintainServer');
@@ -1887,7 +1971,7 @@ begin
       Top := exoMaintainServerRB.Top + exoMaintainServerRB.Height + ScaleY(5);
       Left := ScaleX(20);
       Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
-      Height := ScaleY(30);
+      Height := ScaleY(14);
       Style := csDropDownList;
       Enabled := False;
       Sorted := False;
@@ -1911,7 +1995,7 @@ begin
       Top := exoUninstallServerRB.Top + exoUninstallServerRB.Height + ScaleY(5);
       Left := ScaleX(20);
       Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
-      Height := ScaleY(30);
+      Height := ScaleY(14);
       Style := csDropDownList;
       Enabled := False;
       Sorted := False;
@@ -2139,6 +2223,7 @@ begin
       // Don't panic, fix will restore it anyway, and install will install it anyway
       DeleteFile(appInstPath + '\iobroker.bat');
       if execAndStoreOutput(cmd , LogName, nodePath, appInstPath) then begin
+
         if (FileExists(appInstPath + '\instDone')) then begin
           if expertCB.Checked and exoNewServerRB.Checked and optInstallIoBrokerCB.Checked or optDataMigrationCB.Checked then begin
             Result := reconfigureIoBroker(info, LogName);
@@ -2254,8 +2339,11 @@ begin
       Exit;
     end;
 
-    iobRootPath := ExpandConstant('{app}');
-    appInstPath := iobRootPath;
+    iobHomePath := ExpandConstant('{app}');
+    appInstPath := iobHomePath;
+    if iobExpertPath = '' then begin
+      iobExpertPath := iobHomePath;
+    end;
   end;
 
   // Actions for both, expert and not expert:
@@ -2372,7 +2460,7 @@ begin
   if CurStep = ssInstall then begin
     if expertCB.Checked and exoUninstallServerRB.Checked then begin
       Log('Directory to delete: ' + appInstPath);
-      Log('Registry Key to delete: ' + expertRegRoot + iobServerName);
+      Log('Registry Key to delete: ' + expertRegServersRoot + iobServerName);
       Log('Service to delete: ' + iobServiceName);
 
       // Delete Files
@@ -2391,7 +2479,7 @@ begin
 
         // Delete Registry entry
         if iobServerName <> '' then begin
-          RegDeleteKeyIncludingSubkeys(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName);
+          RegDeleteKeyIncludingSubkeys(HKEY_LOCAL_MACHINE, expertRegServersRoot + iobServerName);
         end;
 
         if UserDefAdminPort then begin
@@ -2422,6 +2510,9 @@ begin
         DelTree(appInstPath + '\semver', True, True, True);
         marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\iobroker-data_old']));
         DelTree(appInstPath + '\iobroker-data_old', True, True, True);
+        marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\iobroker-data_backup']));
+        DelTree(appInstPath + '\iobroker-data_backup', True, True, True);
+        RenameFile(appInstPath + '\iobroker-data', appInstPath + '\iobroker-data_backup');
 
         installationSuccessful := True;
       finally
@@ -2477,18 +2568,27 @@ begin
         end;
       end;
 
-      if (optAddFirewallRuleCB.checked) then begin
+      if cont then begin
         output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall delete rule name="Node for ioBroker (inbound)"', True, '', '');
         Log('Remove firewall inbound:' + output);
         output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall delete rule name="Node for ioBroker (outbound)"', True, '', '');
         Log('Remove firewall outbound:' + output);
-        output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (inbound)" dir=in action=allow program="' + nodePath + '"\node.exe" enable=yes', True, '', '');
-        Log('Modify firewall inbound:' + output);
-        output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (outbound)" dir=out action=allow program="' + nodePath + '"\node.exe" enable=yes', True, '', '');
-        Log('Modify firewall outbound:' + output);
-      end;
+        if optAddFirewallRuleCB.Checked then begin
+          output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (inbound)" dir=in action=allow program="' + nodePath + '\node.exe" enable=yes', True, '', '');
+          Log('Modify firewall inbound:' + output);
+          output := execAndReturnOutput(ExpandConstant('{sys}') + '\netsh advfirewall firewall add rule name="Node for ioBroker (outbound)" dir=out action=allow program="' + nodePath + '\node.exe" enable=yes', True, '', '');
+          Log('Modify firewall outbound:' + output);
+        end;
 
-      if cont then begin
+        if not optServiceAutoStartCB.Checked then begin
+          output := execAndReturnOutput('sc config ' + iobServiceName + '.exe start=demand', False, '', '');
+          Log('Config service demand: ' + output);
+        end
+        else begin
+          output := execAndReturnOutput('sc config ' + iobServiceName + '.exe start=auto', False, '', '');
+          Log('Config service auto: ' + output);
+        end;
+
         if ioBrokerNeedsStart then begin
           try
             marqueePage.SetText(CustomMessage('StartIoBroker'), '');
@@ -2551,10 +2651,20 @@ begin
     Result := Result + NewLine + NewLine + CustomMessage('SummaryFirewall');
 
     if optAddFirewallRuleCB.checked then begin
-      Result := Result + NewLine + Space + Format(CustomMessage('SummaryChangeFirewall'), [appInstPath]);
+      if firewallRuleSet then begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryChangeFirewallKeep'), [appInstPath]);
+      end
+      else begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryChangeFirewall'), [appInstPath]);
+      end
     end
     else begin
-      Result := Result + NewLine + Space + Format(CustomMessage('SummaryNoChangeFirewall'), [appInstPath]);
+      if firewallRuleSet then begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryFirewallRemove'), [appInstPath]);
+      end
+      else begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryNoFirewallKeep'), [appInstPath]);
+      end
     end;
 
     Result := Result + NewLine + NewLine + 'ioBroker:';
@@ -2570,6 +2680,25 @@ begin
       else begin
         Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepIoBrokerProbably'), [appInstPath]);
       end
+    end;
+
+    if not expertCB.Checked or not exoUninstallServerRB.Checked then begin
+      if optServiceAutoStartCB.Checked <> isIobServiceAutoStartReg(iobServiceName) then begin
+        if optServiceAutoStartCB.Checked then begin
+          Result := Result + NewLine + Space + Format(CustomMessage('SummaryChangeServiceToAuto'), [iobServiceName]);
+        end
+        else begin
+          Result := Result + NewLine + Space + Format(CustomMessage('SummaryChangeServiceToMan'), [iobServiceName]);
+        end;
+      end
+      else begin
+        if optServiceAutoStartCB.Checked then begin
+          Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepServiceToAuto'), [iobServiceName]);
+        end
+        else begin
+          Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepServiceToMan'), [iobServiceName]);
+        end;
+      end;
     end;
 
     if optFixIoBrokerCB.checked then begin
@@ -2656,7 +2785,7 @@ var
 begin
   ExtractTemporaryFiles('{tmp}\port.bat');
 
-  expertRegRoot := 'Software\ioBroker\Installer\Servers\';
+  expertRegServersRoot := 'Software\ioBroker\Installer\Servers\';
 
   // Display own welcome page text
   WizardForm.WelcomeLabel2.Caption := CustomMessage('Intro');
@@ -2671,7 +2800,7 @@ begin
   expertCB.Caption := ' ' + CustomMessage('ExpertMode');
   expertCB.OnClick := @expertModeCBClicked;
 
-  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegServersRoot, regServerNames) then begin
     if GetArrayLength(regServerNames) > 0 then begin
       expertCB.Checked := True;
     end;
@@ -2700,11 +2829,17 @@ begin
   if RegKeyExists(HKEY_LOCAL_MACHINE, appRegKey ) then begin
     RegQueryStringValue(HKEY_LOCAL_MACHINE, appRegKey, 'Inno Setup: App Path', appInstPath);
     isFirstInstallerRun := False;
-    Log('ioBroker already installed in '+appInstPath);
-    iobRootPath := appInstPath;
+    Log('ioBroker already installed in ' + appInstPath);
+    iobHomePath := appInstPath;
   end
   else begin
     isFirstInstallerRun := True;
+  end;
+
+  // Will set iobHomePath if found in registry, otherwise it will stay empty
+  RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot, 'RootPath', iobExpertPath);
+  if iobExpertPath = '' then begin
+    iobExpertPath := iobHomePath;
   end;
 
   createPages;
@@ -2735,14 +2870,14 @@ begin
       msg := '';
 
       // First check the default service of a non expert installation:
-      serviceName := getIoBrokerServiceNameFromEnv(iobRootPath);
+      serviceName := getIoBrokerServiceNameFromEnv(iobHomePath);
       if isIobServiceRunning(serviceName) then begin
         msg := msg + chr(13) + chr(10) + ' - ' + serviceName;
       end;
 
-      if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+      if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegServersRoot, regServerNames) then begin
         for i := 0 to GetArrayLength(regServerNames)-1 do begin
-          if RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'ServiceName', serviceName) then begin
+          if RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + regServerNames[i], 'ServiceName', serviceName) then begin
             if isIobServiceRunning(serviceName) then begin
               msg := msg + chr(13) + chr(10) + ' - ' + serviceName;
             end;
@@ -2752,7 +2887,7 @@ begin
           msg :=  chr(13) + chr(10) + msg + chr(13) + chr(10) + chr(13) + chr(10);
           if MsgBox(Format(CustomMessage('NodeInstallationRunningioBrokerExist'), [msg, chr(13) + chr(10)]), mbError, mb_YESNO or MB_SETFOREGROUND) = IDYES then begin
             for i := 0 to GetArrayLength(regServerNames)-1 do begin
-              if RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'ServiceName', serviceName) then begin
+              if RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + regServerNames[i], 'ServiceName', serviceName) then begin
                 if isIobServiceRunning(serviceName) then begin
                   stopIobService(serviceName, '');
                 end;
@@ -2776,10 +2911,10 @@ var
   i: Integer;
   msg: String;
 begin
-  expertRegRoot := 'Software\ioBroker\Installer\Servers\';
+  expertRegServersRoot := 'Software\ioBroker\Installer\Servers\';
   Result := True;
   msg := '';
-  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegServersRoot, regServerNames) then begin
     for i := 0 to GetArrayLength(regServerNames)-1 do begin
       msg := msg + chr(13) + chr(10) + ' - ' + regServerNames[i];
     end;
@@ -2797,6 +2932,17 @@ begin
       Exit;
     end;
   end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure DeinitializeUninstall;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  iobDataDirName: String;
+begin
+  iobDataDirName := ExpandConstant('{app}') + '\iobroker-data';
+  DelTree(iobDataDirName + '_backup', True, True, True);
+  RenameFile(iobDataDirName, iobDataDirName + '_backup');
 end;
 
 {++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -2825,7 +2971,7 @@ begin
   end
   else begin
     // Normal mode, i.e. appInstPath points to the one and only installation, the root path
-    appInstPath := iobRootPath;
+    appInstPath := iobHomePath;
     iobStatesPort := 9000;
     iobObjectsPort := 9001;
     iobAdminPort := 8081;
@@ -2861,7 +3007,7 @@ begin
         iobServerName := exsServerNameEdit.Text;
         iobServiceName := 'iob_' + iobServerName;
         iobTargetServiceName := 'iob_' + iobServerName;
-        appInstPath := iobRootPath + '\_' + iobServiceName;
+        appInstPath := iobExpertPath + '\' + iobServerName;
       end;
     end
     else begin
@@ -2961,6 +3107,7 @@ begin
     Result := False;
   end
   else begin
+    // ToDo: Warning if port is used by another ioBroker?
     Result := True;
   end;
 end;
@@ -3036,12 +3183,12 @@ begin
   output := execAndReturnOutput('sc start ' + iobServiceName + '.exe', False, '', '');
 
   if iobServerName <> '' then begin
-    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'ServerName', iobServerName );
-    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'ServiceName', iobServiceName );
-    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'Path', appInstPath );
-    RegWriteDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'StatesPort', iobstatesPort );
-    RegWriteDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'ObjectsPort', iobObjectsPort );
-    RegWriteDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + iobServerName, 'AdminPort', iobAdminPort );
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + iobServerName, 'ServerName', iobServerName );
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + iobServerName, 'ServiceName', iobServiceName );
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + iobServerName, 'Path', appInstPath );
+    RegWriteDWordValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + iobServerName, 'StatesPort', iobstatesPort );
+    RegWriteDWordValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + iobServerName, 'ObjectsPort', iobObjectsPort );
+    RegWriteDWordValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + iobServerName, 'AdminPort', iobAdminPort );
   end;
 
   // We create a new entry if necessary, so remove the old one
@@ -3057,7 +3204,7 @@ var
   regServerNames: TArrayOfString;
 begin
   Result := False;
-  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegServersRoot, regServerNames) then begin
     Result := (GetArrayLength(regServerNames) > 1);
   end;
 end;
@@ -3173,36 +3320,41 @@ begin
   exoMaintainServerCombo.Items.Clear;
   exoUninstallServerCombo.Items.Clear;
 
-  // Check if a "base" installation is existing:
-  if FileExists(iobRootPath + '\node_modules\iobroker.js-controller/iobroker.js')then begin
+  // Check if a "base" installation is existing and add to server lists:
+  if FileExists(iobHomePath + '\node_modules\iobroker.js-controller/iobroker.js')then begin
     try
       progressPage.SetText(CustomMessage('GatherInformation'), 'ioBroker');
       progressPage.Show
       progressPage.SetProgress(1,2);
-      curInstServiceName := getIoBrokerServiceNameFromEnv(iobRootPath);
-      gatherIobPortsAndServername(iobRootPath, statesPort, objectsPort, adminPort, serverName);
-      exoMaintainServerCombo.Items.add(fillStringWithBlanks(serverName, 16) + ' | ' + iobRootPath);
-      exoUninstallServerCombo.Items.add(fillStringWithBlanks(serverName, 16) + ' | ' + iobRootPath);
+      curInstServiceName := getIoBrokerServiceNameFromEnv(iobHomePath);
+      gatherIobPortsAndServername(iobHomePath, statesPort, objectsPort, adminPort, serverName);
+      exoMaintainServerCombo.Items.add(fillStringWithBlanks(serverName, 16) + ' | ' + iobHomePath);
+      exoUninstallServerCombo.Items.add(fillStringWithBlanks(serverName, 16) + ' | ' + iobHomePath);
       progressPage.SetProgress(2,2);
     except
       Log(GetExceptionMessage);
     finally
       progressPage.Hide
     end;
+  end;
+
+  // Check if in the current expert path an installation is existing:
+  if FileExists(iobExpertPath + '\node_modules\iobroker.js-controller/iobroker.js')then begin
     exoNewServerRB.Enabled := False;
-    exoNewServerLabel.Caption := CustomMessage('ExpertNewServerForbiddenDesc');
-    exoUninstallServerRB.Checked := True;
+    exoNewServerLabel.Caption := Format(CustomMessage('ExpertNewServerForbiddenDesc'), [iobExpertPath]);
+    exoMaintainServerRB.Checked := True;
   end
   else begin
     exoNewServerRB.Enabled := True;
-    exoNewServerLabel.Caption := CustomMessage('ExpertNewServerDesc');
+    exoNewServerLabel.Caption := CustomMessage('ExpertNewServerDesc') + chr(13) + chr(10) +
+                                 Format(CustomMessage('ExpertNewServerIn'), [iobExpertPath]);
     exoNewServerRB.Checked := True;
   end;
 
   // Add servers stored in Registry to comboboxes
-  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+  if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegServersRoot, regServerNames) then begin
     for i := 0 to GetArrayLength(regServerNames)-1 do begin
-      if not RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'Path', regPath) then begin
+      if not RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + regServerNames[i], 'Path', regPath) then begin
         regPath := '<unknown>';
       end;
       exoMaintainServerCombo.Items.add(fillStringWithBlanks(regServerNames[i], 16) + ' | ' + regPath);
@@ -3246,13 +3398,13 @@ begin
     done := False;
     modified := True;
     while not done and modified do begin
-      if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+      if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegServersRoot, regServerNames) then begin
         if GetArrayLength(regServerNames) > 0 then begin
           modified := False;
           for i := 0 to GetArrayLength(regServerNames)-1 do begin
-            RegQueryDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'StatesPort', sprt);
-            RegQueryDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'ObjectsPort', oprt);
-            RegQueryDWordValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'AdminPort', aprt);
+            RegQueryDWordValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + regServerNames[i], 'StatesPort', sprt);
+            RegQueryDWordValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + regServerNames[i], 'ObjectsPort', oprt);
+            RegQueryDWordValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + regServerNames[i], 'AdminPort', aprt);
             if (sprt = statesPort) or (sprt = objectsPort) or (sprt = adminPort) or
                (oprt = statesPort) or (oprt = objectsPort) or (oprt = adminPort) or
                (aprt = statesPort) or (aprt = objectsPort) or (aprt = adminPort)
@@ -3278,11 +3430,11 @@ begin
     j := 0;
     while not done and modified do begin
       j := j + 1;
-      if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegRoot, regServerNames) then begin
+      if RegGetSubkeyNames(HKEY_LOCAL_MACHINE, expertRegServersRoot, regServerNames) then begin
         if GetArrayLength(regServerNames) > 0 then begin
           modified := False;
           for i := 0 to GetArrayLength(regServerNames)-1 do begin
-            RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegRoot + regServerNames[i], 'ServerName', srvName);
+            RegQueryStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot + regServerNames[i], 'ServerName', srvName);
             if srvName = serverName then begin
               serverName := 'SmartHome' + IntToStr(j);
               modified := True;
@@ -3371,4 +3523,76 @@ begin
     exoUninstallServerCombo.Enabled := True;
   end;
 end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function expertDirectoryAllowed(path: String; var retry: Boolean): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  retry := False;
+  Result := not FileExists(path + '\node_modules\iobroker.js-controller/iobroker.js');
+  if not Result then begin
+    retry := MsgBox(Format(CustomMessage('DirForbidden'), [path]), mbError, MB_RETRYCANCEL) = IDRETRY;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure expertSelectDirectory(sender: TObject);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  dir: String;
+  subDir: String;
+  s: String;
+  i: Integer;
+  p: Integer;
+  valid: Boolean;
+  abort: Boolean;
+  retry: Boolean;
+begin
+  repeat
+    dir := iobExpertPath;
+    valid := True;
+    abort := False;
+    if BrowseForFolder(CustomMessage('SelectMigrationDir'), dir, True) then begin
+      i := 0;
+      s := RemoveBackslash(dir);
+      subDir := '';
+      repeat
+        p := Pos('\',s);
+        if p > 0 then begin
+          if subDir <> '' then subdir := subDir + '\';
+          subDir := subdir + Copy(s, 1, p-1);
+          Log(subDir);
+          if not expertDirectoryAllowed(subDir, retry) then begin
+            valid := False;
+            if retry then Break else Exit;
+          end;
+          s := Copy(s, p + 1, Length(s));
+          i := i + 1;
+        end
+        else begin
+          if subDir <> '' then subdir := subDir + '\';
+          subDir := subDir + s;
+          if not expertDirectoryAllowed(subDir, retry) then begin
+            valid := False;
+            if retry then Break else Exit;
+          end;
+          Log(s);
+          s := '';
+        end;
+      until Length(s) = 0;
+    end
+    else begin
+      valid := False;
+      abort := True;
+      break;
+    end;
+  until valid or abort;
+
+  if valid then begin
+    iobExpertPath := RemoveBackslash(dir);
+    RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot, 'RootPath', iobExpertPath );
+  end;
+  updateExpertOptonsPage;
+end;
+
 
