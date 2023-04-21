@@ -6,20 +6,20 @@ Pre-requires:
 
 - Node JS with NPM
 - Windows to build .exe
-- Internet connection, because the **ioBroker.nodejs** will be downloaded by gulp.
+- Internet connection, because the `nodejs` will be downloaded by gulp.
 
 #Build on windows:
 
-1. download and extract to some directory: https://github.com/ioBroker/ioBroker.build/archive/master.zip, e.g. to _d:\ioBroker.build_
+1. download and extract to some directory: https://github.com/ioBroker/ioBroker.build/archive/master.zip, e.g. to `d:\ioBroker.build`
 
-2. Start the console (cmd.exe) and go to _d:\ioBroker.build_:
+2. Start the console (cmd.exe) and go to `d:\ioBroker.build`:
 
 ```
    >d:
    >cd ioBroker.build
 ```
 
-3. Install grunt-cli:
+3. Install gulp-cli:
 
 ```
    >npm install
@@ -31,14 +31,14 @@ Pre-requires:
    >npm run build
 ```
 
-5. To finish .exe build, go to d:\ioBroker.build\build\.windows-ready and call createSetup.bat
+5. To finish `.exe` build, go to `d:\ioBroker.build\build\.windows-ready` and call `createSetup.bat`
 
 ```
    >cd build\.windows-ready
    >createSetup.bat
 ```
 
-6. The result will be stored in d:\ioBroker.build\delivery as ioBrokerInstaller.VX.y.z.exe
+6. The result will be stored in `d:\ioBroker.build\delivery` as `ioBrokerInstaller.VX.y.z.exe`
 
 ## Changelog
 
@@ -49,25 +49,21 @@ Pre-requires:
 - (Gaspode) Fixed firewall rules
 
 # 2.1.1 (30.03.2023)
-
 - (Gaspode) Layout optimizations
-- (Gaspode) Refactored and optimzed code, cleanup
+- (Gaspode) Refactored and optimized code, cleanup
 - (Gaspode) Support multi server installations in expert mode
 - (Gaspode) Copy the installer itself to ioBroker directory and create shortcut
-- (Gaspode) Recognize stabilostick installation folder and abort installation
+- (Gaspode) Recognize `stabilostick` installation folder and abort installation
 - (Gaspode) Data migration for new installations implemented
 - (Gaspode) Translations completed
-
 # 2.1.0 (09.03.2023)
 
 - (Gaspode) Implemented option to modify the Windows firewall
 - (Gaspode) Ensured that the node path was set correctly when calling `npx`
 
 # 2.0.0 (04.03.2023)
-
 - (Gaspode) Improved look & feel, improved error handling, added several checks, implemented more options
 - (Gaspode) added several languages
 
 # 1.1.0 (21.05.2022)
-
 - (bluefox) Initial release
