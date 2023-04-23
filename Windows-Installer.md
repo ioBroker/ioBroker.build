@@ -1,8 +1,10 @@
 # Inhaltsverzeichnis
 
+Todo: Inhaltsverzeichnis
 [TOC]
 
-#Der ioBroker Windows Installer
+# Der ioBroker Windows Installer
+
 Mit dem ioBroker Windows Installer kann ioBroker mit wenigen Klicks auf Windows PCs installiert werden. Der Installer bringt selbst keine Softwarepakete mit. Benötigte Software wird automatisch während der Installation heruntergeladen. Eine Internetverbindung ist also zwingend erforderlich.
 
 Ist ioBroker erst einmal installiert, kann der Installer für folgende Aktionen verwendet werden:
