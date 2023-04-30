@@ -140,3 +140,5 @@ polish.DirForbidden=Ten katalog nie jest dozwolony, ponieważ w %s jest już zai
 polish.SummaryChangeFirewallKeep=Reguły zapory istnieją i nie zostaną zmienione
 polish.SummaryFirewallRemove=Reguły zapory sieciowej istnieją i zostaną usunięte
 polish.SummaryNoFirewallKeep=Reguły zapory sieciowej nie istnieją i nie zostaną utworzone
+polish.DownloadError=Błąd podczas pobierania pliku %s
+polish.FolderInvalidCharacter=Niedozwolona nazwa katalogu, zawiera nieprawidłowy znak %s

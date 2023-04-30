@@ -140,3 +140,5 @@ german.DirForbidden=Dieses Verzeichnis ist nicht erlaubt, weil in %s bereits ein
 german.SummaryChangeFirewallKeep=Es existieren Windows Firewall Regeln und diese werden nicht verändert
 german.SummaryFirewallRemove=Die Windows Firewall Regeln werden gelöscht
 german.SummaryNoFirewallKeep=Es existieren keine Windows Firewall Regeln und es werden keine angelegt
+german.DownloadError=Fehler beim Herunterladen der Datei %s
+german.FolderInvalidCharacter=Verzeichnisname nicht erlaubt, enthält ungültiges Zeichen %s

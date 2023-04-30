@@ -140,3 +140,5 @@ dutch.DirForbidden=Deze map is niet toegestaan ​​omdat er in %s al een ioBro
 dutch.SummaryChangeFirewallKeep=Firewallregels bestaan ​​en zullen niet worden gewijzigd
 dutch.SummaryFirewallRemove=Firewallregels bestaan ​​en zullen worden verwijderd
 dutch.SummaryNoFirewallKeep=Firewallregels bestaan ​​niet en worden niet gemaakt
+dutch.DownloadError=Fout bij het downloaden van bestand %s
+dutch.FolderInvalidCharacter=Directorynaam niet toegestaan, bevat ongeldig karakter %s

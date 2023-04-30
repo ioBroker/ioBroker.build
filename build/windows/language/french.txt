@@ -140,3 +140,5 @@ french.DirForbidden=Ce répertoire n'est pas autorisé car dans %s, un serveur ioB
 french.SummaryChangeFirewallKeep=Des règles de pare-feu existent et ne seront pas modifiées
 french.SummaryFirewallRemove=Des règles de pare-feu existent et seront supprimées
 french.SummaryNoFirewallKeep=Les règles de pare-feu n'existent pas et ne seront pas créées
+french.DownloadError=Erreur lors du téléchargement du fichier %s
+french.FolderInvalidCharacter=Nom de répertoire non autorisé, contient un caractère invalide %s
