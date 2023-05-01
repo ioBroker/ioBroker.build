@@ -18,9 +18,11 @@
 ; - 05.04.2023 Gaspode: Uninstall: keep iobroker-data, but rename it to iobroker-data_backup   -
 ; - 08.04.2023 Gaspode: Allow to change the root folder for installations in expert mode       -
 ; - 18.04.2023 Gaspode: Fixed firewall rules                                                   -
-; - 28.04.2023 Gaspode: Catch several error conditions                                         -
+; - 28.04.2023 Gaspode: Catch and handle several error conditions                              -
 ; - 28.04.2023 Gaspode: Use a location for temporary files which causes less problems          -
 ; - 29.04.2023 Gaspode: Handle ampersand properly when setting path variable                   -
+; - 01.05.2023 Gaspode: Remove empty installation root folder if first installation is         -
+; -                     cancelled                                                              -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -2439,6 +2441,9 @@ procedure DeinitializeSetup;
 begin
   if (Length(getTempPathName) > 5) and (Length(iobHomePath) > 3) then begin
     DelTree(getTempPath, True, True, True);
+    if isDirectoryEmpty(iobHomePath) then begin
+      DelTree(iobHomePath, True, False, False);
+    end;
   end;
 end;
 
