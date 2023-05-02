@@ -50,7 +50,7 @@ Pre-requires:
 # 2.2.0 (18.04.2023)
 - (Gaspode) Option added to set windows service startmode (auto, manual)
 - (Gaspode) Uninstall: keep iobroker-data, but rename it to iobroker-data_backup
-- (Gaspode) Allow to change the root folder for installations in expert mode
+- (Gaspode) Allows changing the root folder for installations in expert mode
 - (Gaspode) Fixed firewall rules
 
 # 2.1.1 (30.03.2023)
