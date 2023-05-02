@@ -140,3 +140,5 @@ italian.DirForbidden=Questa directory non è consentita perché in %s è già instal
 italian.SummaryChangeFirewallKeep=Le regole del firewall esistono e non verranno modificate
 italian.SummaryFirewallRemove=Le regole del firewall esistono e verranno eliminate
 italian.SummaryNoFirewallKeep=Le regole del firewall non esistono e non verranno create
+italian.DownloadError=Errore durante il download del file %s
+italian.FolderInvalidCharacter=Nome directory non consentito, contiene carattere non valido %s

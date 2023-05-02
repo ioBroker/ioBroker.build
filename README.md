@@ -42,6 +42,11 @@ Pre-requires:
 
 ## Changelog
 
+# 2.2.1 (30.04.2023)
+- (Gaspode) Catch and handle several error conditions
+- (Gaspode) Use a location for temporary files which causes less problems
+- (Gaspode) Handle ampersand character properly when setting path variable
+
 # 2.2.0 (18.04.2023)
 - (Gaspode) Option added to set windows service startmode (auto, manual)
 - (Gaspode) Uninstall: keep iobroker-data, but rename it to iobroker-data_backup

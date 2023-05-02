@@ -140,3 +140,5 @@ english.DirForbidden=This directory is not allowed because in %s there is alread
 english.SummaryChangeFirewallKeep=Firewall rules exist and will not be changed
 english.SummaryFirewallRemove=Firewall rules exist and will be deleted
 english.SummaryNoFirewallKeep=Firewall rules do not exist and will not be created
+english.DownloadError=Error when downloading file %s
+english.FolderInvalidCharacter=Directory name not allowed, contains invalid character %s

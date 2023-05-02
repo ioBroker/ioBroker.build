@@ -140,3 +140,5 @@ spanish.DirForbidden=Este directorio no está permitido porque en %s ya hay un se
 spanish.SummaryChangeFirewallKeep=Las reglas del cortafuegos existen y no se cambiarán
 spanish.SummaryFirewallRemove=Las reglas del cortafuegos existen y se eliminarán
 spanish.SummaryNoFirewallKeep=Las reglas de firewall no existen y no se crearán
+spanish.DownloadError=Error al descargar el archivo %s
+spanish.FolderInvalidCharacter=Nombre de directorio no permitido, contiene carácter no válido %s

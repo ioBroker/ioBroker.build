@@ -140,3 +140,5 @@ portuguese.DirForbidden=Este diretório não é permitido porque em %s já exist
 portuguese.SummaryChangeFirewallKeep=As regras de firewall existem e não serão alteradas
 portuguese.SummaryFirewallRemove=As regras de firewall existem e serão excluídas
 portuguese.SummaryNoFirewallKeep=Regras de firewall não existem e não serão criadas
+portuguese.DownloadError=Erro ao baixar o arquivo %s
+portuguese.FolderInvalidCharacter=Nome do diretório não permitido, contém caractere inválido %s

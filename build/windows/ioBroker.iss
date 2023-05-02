@@ -18,6 +18,11 @@
 ; - 05.04.2023 Gaspode: Uninstall: keep iobroker-data, but rename it to iobroker-data_backup   -
 ; - 08.04.2023 Gaspode: Allow to change the root folder for installations in expert mode       -
 ; - 18.04.2023 Gaspode: Fixed firewall rules                                                   -
+; - 28.04.2023 Gaspode: Catch and handle several error conditions                              -
+; - 28.04.2023 Gaspode: Use a location for temporary files which causes less problems          -
+; - 29.04.2023 Gaspode: Handle ampersand properly when setting path variable                   -
+; - 01.05.2023 Gaspode: Remove empty installation root folder if first installation is         -
+; -                     cancelled                                                              -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -62,7 +67,6 @@ Name: "{group}\ioBroker Setup"; Filename: "{app}\ioBrokerInstaller.exe"; IconFil
 
 [Files]
 Source: "resource\{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "resource\port.bat"; DestDir: "{tmp}"
 Source: "{srcexe}"; DestDir: "{app}"; DestName: "ioBrokerInstaller.exe"; Flags: external overwritereadonly replacesameversion
 
 ; Do not display required disk space:
@@ -307,6 +311,34 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getTempPathName: String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := iobHomePath + '\~tmpInstaller#Gaspode';
+  if iobHomePath = '' then begin
+    Log('Warning: TempPathName called but no home path set!');
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getTempPath: String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if not dirExists(getTempPathName) then begin
+    ForceDirectories(getTempPathName);
+  end;
+  Result := getTempPathName;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function DownloadTemporaryFileAndCopy(const Url, FileName, RequiredSHA256OfFile: String; const OnDownloadProgress: TOnDownloadProgress): Int64;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := DownloadTemporaryFile(Url, FileName, RequiredSHA256OfFile, OnDownloadProgress);
+  FileCopy(ExpandConstant('{tmp}') + '\' + FileName, getTempPath + '\' + FileName, False);
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function success: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
@@ -522,17 +554,17 @@ var
   i: Integer;
 begin
   Result := '';
-  tmpTxtFileName := ExpandConstant('{tmp}') + '\~iobinst_tmp.txt';
-  tmpBatFileName := ExpandConstant('{tmp}') + '\~iobinst_tmp.bat';
+  tmpTxtFileName := getTempPath + '\~iobinst_tmp.txt';
+  tmpBatFileName := getTempPath + '\~iobinst_tmp.bat';
 
   if addPath <> '' then begin
-    myCmd := '@echo off' + chr(13) + chr(10) + 'SET PATH=' + addPath + ';%PATH%' + chr(13) + chr(10) + myCmd;
+    myCmd := '@echo off' + chr(13) + chr(10) + 'SET PATH=' + addPath + ';%PATH:&=^&%' + chr(13) + chr(10) + myCmd;
   end
   else begin
     myCmd := '@echo off' + chr(13) + chr(10) + myCmd;
   end;
 
-  if (SaveStringToFile(tmpBatFileName, '@' + myCmd, false)) then begin
+  if (SaveStringToFile(tmpBatFileName, myCmd, false)) then begin
     if (Exec(ExpandConstant('{cmd}'), '/C ' + tmpBatFileName + ' > "' + tmpTxtFileName + '" 2>&1', wrkDir, SW_HIDE, ewWaitUntilTerminated, resultCode)) then begin
       if LoadStringsFromFile(tmpTxtFileName, stdOutTxt) then begin
         if GetArrayLength(stdOutTxt) > 0 then begin
@@ -561,10 +593,10 @@ var
   logPart: String;
 begin
   Result := False;
-  tmpBatFileName := ExpandConstant('{tmp}') + '\~iobinst_tmp.bat';
+  tmpBatFileName := getTempPath + '\~iobinst_tmp.bat';
 
   if addPath <> '' then begin
-    myCmd := '@echo off' + chr(13) + chr(10) + 'SET PATH=' + addPath + ';%PATH%' + chr(13) + chr(10) + myCmd;
+    myCmd := '@echo off' + chr(13) + chr(10) + 'SET PATH=' + addPath + ';%PATH:&=^&%' + chr(13) + chr(10) + myCmd;
   end
   else begin
     myCmd := '@echo off' + chr(13) + chr(10) + myCmd;
@@ -577,7 +609,7 @@ begin
     logPart := '';
   end;
 
-  if (SaveStringToFile(tmpBatFileName, '@' + myCmd, false)) then begin
+  if (SaveStringToFile(tmpBatFileName, myCmd, false)) then begin
     if (Exec(ExpandConstant('{cmd}'), '/C ' + tmpBatFileName + logPart, wrkDir, SW_HIDE, ewWaitUntilTerminated, resultCode)) then begin
       Result := True;
     end;
@@ -720,7 +752,7 @@ function OnDownloadProgress(const Url, FileName: String; const Progress, Progres
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   if Progress = ProgressMax then
-    Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
+    Log(Format('Successfully downloaded file to %s: %s', [getTempPath, FileName]));
   Result := True;
 end;
 
@@ -730,7 +762,7 @@ function OnDownloadProgressNode(const Url, FileName: String; const Progress, Pro
 begin
   progressPage.SetProgress(Progress, ProgressMax);
   if Progress = ProgressMax then
-    Log(Format('Successfully downloaded file to {tmp}: %s', [FileName]));
+    Log(Format('Successfully downloaded file to %s: %s', [getTempPath, FileName]));
   Result := True;
 end;
 
@@ -756,11 +788,57 @@ begin
   Result := pos('RUNNING', statusString) > 0;
 end;
 
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure createPortBatch;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  txt: String;
+begin
+  if not fileExists(getTempPath + '\port.bat') then begin
+    txt := '@echo off & setlocal EnableDelayedExpansion' + #13#10
+         + 'if [%1]==[] goto:ERROR' + #13#10
+         +'set port=%1' + #13#10
+         + 'set last=[]' + #13#10
+         + 'for /f "tokens=1-5" %%a in (''netstat -ano'') do (' + #13#10
+         + '  if [%%b] == [[::]:%port%] (' + #13#10
+         + '    if not [%%e]==[0] (' + #13#10
+         + '      if not !last! == [%%e] (' + #13#10
+         + '        for /f "skip=3 tokens=1-5" %%i in (''tasklist /FO TABLE /FI "PID eq %%e"'') do (' + #13#10
+         + '          echo %port%;%%i;%%e' + #13#10
+         + '        )' + #13#10
+         + '      )' + #13#10
+         + '      set last=[%%e]' + #13#10
+         + '    )' + #13#10
+         + '  )' + #13#10
+         + #13#10
+         + '  if [%%b] == [127.0.0.1:%port%] (' + #13#10
+         + '    if not [%%e]==[0] (' + #13#10
+         + '      if not !last! == [%%e] (' + #13#10
+         + '        for /f "skip=3 tokens=1-5" %%i in (''tasklist /FO TABLE /FI "PID eq %%e"'') do (' + #13#10
+         + '          echo %port%;%%i;%%e' + #13#10
+         + '        )' + #13#10
+         + '      )' + #13#10
+         + '      set last=[%%e]' + #13#10
+         + '    )' + #13#10
+         + '  )' + #13#10
+         + ')' + #13#10
+         + #13#10
+         + 'goto:eof' + #13#10
+         + ':ERROR' + #13#10
+         + 'echo ERROR - No port given' + #13#10;
+    saveStringToFile(getTempPath + '\port.bat', txt, false);
+  end;
+end;
+
+
+
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function getPortInfo(port: Integer): String;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
-  Result := execAndReturnOutput(Format('%s\port.bat %d', [ExpandConstant('{tmp}'), port]), False, '', '');
+  createPortBatch
+  Result := execAndReturnOutput(Format('%s\port.bat %d', [getTempPath, port]), False, '', '');
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -882,7 +960,7 @@ begin
   ioBrokerEx := iobPath + '\node_modules\iobroker.js-controller/iobroker.js';
   if (FileExists(ioBrokerEx)) and (nodePath <> '' )then begin
     nodeJsEx := nodePath + '\node.exe';
-    tmpFileName := ExpandConstant('{tmp}') + '\~iobinstAdmin_tmp.txt';
+    tmpFileName := getTempPath + '\~iobinstAdmin_tmp.txt';
     if execAndStoreOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" list instances', tmpFileName, nodePath, '' ) then begin
       if LoadStringsFromFile(tmpFileName, instanceList) then begin
         if GetArrayLength(instanceList) > 0 then begin
@@ -925,27 +1003,29 @@ begin
     LoadStringFromFile(iobPath + '\iobroker-data\iobroker.json', jsonString);
     ClearJsonParser(JsonParser);
     ParseJson(JsonParser, jsonString);
-    if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'states', jsonObject) then begin
-      if FindJsonNumber(JsonParser.Output, jsonObject, 'port', jsonPort) then begin
-        statesPort := Round(jsonPort);
-        Log('States port found!');
-      end;
-    end;
-    if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'objects', jsonObject) then begin
-      if FindJsonNumber(JsonParser.Output, jsonObject, 'port', jsonPort) then begin
-        objectsPort := Round(jsonPort);
-        Log('Objects port found!');
-      end;
-    end;
-    if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'system', jsonObject) then begin
-      if FindJsonStrValue(JsonParser.Output, jsonObject, 'hostname', serverName) then begin
-        if servername = '' then begin
-          serverName := '<Default>';
+    if Length(JsonParser.Output.Objects) > 0 then begin
+      if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'states', jsonObject) then begin
+        if FindJsonNumber(JsonParser.Output, jsonObject, 'port', jsonPort) then begin
+          statesPort := Round(jsonPort);
+          Log('States port found!');
         end;
-        Log('Hostname/Servername found!');
-      end
-      else begin
-        Log('Hostname/Servername NOT found!');
+      end;
+      if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'objects', jsonObject) then begin
+        if FindJsonNumber(JsonParser.Output, jsonObject, 'port', jsonPort) then begin
+          objectsPort := Round(jsonPort);
+          Log('Objects port found!');
+        end;
+      end;
+      if FindJsonObject(JsonParser.Output, JsonParser.Output.Objects[0], 'system', jsonObject) then begin
+        if FindJsonStrValue(JsonParser.Output, jsonObject, 'hostname', serverName) then begin
+          if servername = '' then begin
+            serverName := '<Default>';
+          end;
+          Log('Hostname/Servername found!');
+        end
+        else begin
+          Log('Hostname/Servername NOT found!');
+        end;
       end;
     end;
   end;
@@ -1038,12 +1118,12 @@ begin
   try
     if rcmdNodeVersionMajor = 0 then begin
       try
-        DownloadTemporaryFile('https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.info/master/admin/lib/data/infoData.json', '~iobinfo.json', '', @OnDownloadProgress);
+        DownloadTemporaryFileAndCopy('https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.info/master/admin/lib/data/infoData.json', '~iobinfo.json', '', @OnDownloadProgress);
       except
         errorOccurred := True;
       end;
       if not errorOccurred then begin
-        LoadStringFromFile(ExpandConstant('{tmp}') + '\~iobinfo.json', jsonString);
+        LoadStringFromFile(getTempPath + '\~iobinfo.json', jsonString);
         ClearJsonParser(JsonParser);
         ParseJson(JsonParser, jsonString);
         if Length(JsonParser.Output.Objects) > 0 then begin
@@ -1071,13 +1151,13 @@ begin
       end;
 
       try
-        DownloadTemporaryFile('https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt', '', @OnDownloadProgress);
+        DownloadTemporaryFileAndCopy('https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt', '', @OnDownloadProgress);
       except
         Log(GetExceptionMessage);
         MsgBox(Format(CustomMessage('DownloadErrorGatherNode'), ['https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt']), mbError, MB_OK);
         Exit;
       end;
-      if LoadStringsFromFile(ExpandConstant('{tmp}') + '\~nodeInfo.txt', nodeLatestList) then begin
+      if LoadStringsFromFile(getTempPath + '\~nodeInfo.txt', nodeLatestList) then begin
         if (IsWin64) then begin
           searchString := '-x64.msi';
         end
@@ -1167,7 +1247,12 @@ begin
     explode(portInfoArray, portInfo, ';');
     sumInfo1PortStatesLabelA.Font.Color := clRed;
     sumInfo1PortStatesLabelA.Caption := '⚠';
-    sumInfo2PortStatesLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+    if GetArrayLength(portInfoArray) >= 3 then begin
+      sumInfo2PortStatesLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+    end
+    else begin
+      sumInfo2PortStatesLabelA.Caption := Format('<unknown> %s', [portInfo]);
+    end;
     readyToInstall := False;
     portsInUse := True;
   end
@@ -1183,7 +1268,12 @@ begin
     explode(portInfoArray, portInfo, ';');
     sumInfo1PortObjectsLabelA.Font.Color := clRed;
     sumInfo1PortObjectsLabelA.Caption := '⚠';
-    sumInfo2PortObjectsLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+    if GetArrayLength(portInfoArray) >= 3 then begin
+      sumInfo2PortObjectsLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+    end
+    else begin
+      sumInfo2PortObjectsLabelA.Caption := Format('<unknown> %s', [portInfo]);
+    end;
     readyToInstall := False;
     portsInUse := True;
   end
@@ -1199,7 +1289,12 @@ begin
     explode(portInfoArray, portInfo, ';');
     sumInfo1PortAdminLabelA.Font.Color := clRed;
     sumInfo1PortAdminLabelA.Caption := '⚠';
-    sumInfo2PortAdminLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+    if GetArrayLength(portInfoArray) >= 3 then begin
+      sumInfo2PortAdminLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+    end
+    else begin
+      sumInfo2PortAdminLabelA.Caption := Format('<unknown> %s', [portInfo]);
+    end;
     readyToInstall := False;
     portsInUse := True;
   end
@@ -1224,7 +1319,12 @@ begin
       explode(portInfoArray, portInfo, ';');
       sumInfo1PortStatesLabelB.Font.Color := clRed;
       sumInfo1PortStatesLabelB.Caption := '⚠';
-      sumInfo2PortStatesLabelB.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      if GetArrayLength(portInfoArray) >= 3 then begin
+        sumInfo2PortStatesLabelB.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      end
+      else begin
+        sumInfo2PortStatesLabelB.Caption := Format('<unknown> %s', [portInfo]);
+      end;
       readyToInstall := False;
       portsInUse := True;
     end
@@ -1246,7 +1346,12 @@ begin
       explode(portInfoArray, portInfo, ';');
       sumInfo1PortObjectsLabelB.Font.Color := clRed;
       sumInfo1PortObjectsLabelB.Caption := '⚠';
-      sumInfo2PortObjectsLabelB.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      if GetArrayLength(portInfoArray) >= 3 then begin
+        sumInfo2PortObjectsLabelB.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      end
+      else begin
+        sumInfo2PortObjectsLabelB.Caption := Format('<unknown> %s', [portInfo]);
+      end;
       readyToInstall := False;
       portsInUse := True;
     end
@@ -1268,7 +1373,12 @@ begin
       explode(portInfoArray, portInfo, ';');
       sumInfo1PortAdminLabelB.Font.Color := clRed;
       sumInfo1PortAdminLabelB.Caption := '⚠';
-      sumInfo2PortAdminLabelB.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      if GetArrayLength(portInfoArray) >= 3 then begin
+        sumInfo2PortAdminLabelB.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      end
+      else begin
+        sumInfo2PortAdminLabelB.Caption := Format('<unknown> %s', [portInfo]);
+      end;
       readyToInstall := False;
       portsInUse := True;
     end
@@ -2107,14 +2217,14 @@ begin
       progressPage.SetText(CustomMessage('DownloadingNodejs'), Format(CustomMessage('DownloadingNodejsVersion'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]));
       progressPage.Show
       try
-        DownloadTemporaryFile(rcmdNodeDownloadPath, 'node.msi', '', @OnDownloadProgressNode);
+        DownloadTemporaryFileAndCopy(rcmdNodeDownloadPath, 'node.msi', '', @OnDownloadProgressNode);
       except
         Log(GetExceptionMessage);
         MsgBox(Format(CustomMessage('DownloadErrorNode'), [rcmdNodeDownloadPath]), mbError, MB_OK);
         Exit;
       end;
 
-      if (FileExists(ExpandConstant('{tmp}') + '\node.msi')) then begin
+      if (FileExists(getTempPath + '\node.msi')) then begin
         Log('Node.js download: Success!');
         Result := True;
       end
@@ -2144,7 +2254,7 @@ begin
       marqueePage.SetText(CustomMessage('InstallingNodejs'), Format(CustomMessage('InstallingNodejsVersion'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]));
       marqueePage.Show
       marqueePage.Animate
-      Result := execAndStoreOutput('msiexec /qn /l* ' + getLogNameNodeJsInstall + ' /i ' + ExpandConstant('{tmp}') + '\node.msi', '', '', appInstPath);
+      Result := execAndStoreOutput('msiexec /qn /l* ' + getLogNameNodeJsInstall + ' /i ' + getTempPath + '\node.msi', '', '', appInstPath);
 
       if LoadStringFromFile(getLogNameNodeJsInstall, logText) then begin
         if Pos('Configuration completed successfully', logText) = 0 then begin
@@ -2326,6 +2436,18 @@ end;
  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure DeinitializeSetup;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if (Length(getTempPathName) > 5) and (Length(iobHomePath) > 3) then begin
+    DelTree(getTempPath, True, True, True);
+    if isDirectoryEmpty(iobHomePath) then begin
+      DelTree(iobHomePath, True, False, False);
+    end;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function NextButtonClick(CurPageID: Integer): Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
@@ -2339,8 +2461,15 @@ begin
       Exit;
     end;
 
+    if Pos('&', ExpandConstant('{app}')) > 0 then begin
+      MsgBox(Format(CustomMessage('FolderInvalidCharacter'),['&']), mbError, MB_OK or MB_SETFOREGROUND);
+      Result := False;
+      Exit;
+    end;
+
     iobHomePath := ExpandConstant('{app}');
     appInstPath := iobHomePath;
+
     if iobExpertPath = '' then begin
       iobExpertPath := iobHomePath;
     end;
@@ -2783,8 +2912,6 @@ var
   licTxt: String;
   regServerNames: TArrayOfString;
 begin
-  ExtractTemporaryFiles('{tmp}\port.bat');
-
   expertRegServersRoot := 'Software\ioBroker\Installer\Servers\';
 
   // Display own welcome page text
@@ -3530,8 +3657,15 @@ function expertDirectoryAllowed(path: String; var retry: Boolean): Boolean;
 begin
   retry := False;
   Result := not FileExists(path + '\node_modules\iobroker.js-controller/iobroker.js');
+
   if not Result then begin
     retry := MsgBox(Format(CustomMessage('DirForbidden'), [path]), mbError, MB_RETRYCANCEL) = IDRETRY;
+  end
+  else begin
+    Result := Pos('&', path) = 0;
+    if not Result then begin
+      retry := MsgBox(Format(CustomMessage('FolderInvalidCharacter'),['&']), mbError, MB_RETRYCANCEL) = IDRETRY;
+    end;
   end;
 end;
 
