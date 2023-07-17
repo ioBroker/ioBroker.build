@@ -23,6 +23,8 @@
 ; - 29.04.2023 Gaspode: Handle ampersand properly when setting path variable                   -
 ; - 01.05.2023 Gaspode: Remove empty installation root folder if first installation is         -
 ; -                     cancelled                                                              -
+; - 16.07.2023 Gaspode: Workaround for Node installation bug. In case that prefix directory is -
+; -                     not created, the installer will create it                              -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -603,7 +605,7 @@ begin
   end;
 
   if myLogFileName <> '' then begin
-    logPart := ' > "' + myLogFileName + '" 2>&1';
+    logPart := ' >> "' + myLogFileName + '" 2>>&1';
   end
   else begin
     logPart := '';
@@ -2281,6 +2283,39 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure fixPrefixPath(logFileName: String);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  prefixPath: String;
+begin
+  // In rare cases the node installer does not create the global prefix directory.
+  // If this happens, all calls of npx will fail. We create this directory as a workaround
+  // if it does not exist yet:
+  prefixPath := execAndReturnOutput('"' + nodePath + '\npm" prefix -g', False, '', '');
+  Log('npm prefix path: ' + prefixPath);
+  if dirExists(prefixPath) then begin
+    SaveStringToFile(logFileName,
+                     '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                     'Npm prefix path exists: ' + prefixPath + chr(13) + chr(10) +
+                     '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
+  end
+  else begin
+    SaveStringToFile(logFileName,
+                     '----------------------------------------------' + chr(13) + chr(10) +
+                     'Npm prefix path does NOT exist: ' + prefixPath + ' Try to create it.' + chr(13) + chr(10), True);
+
+    if ForceDirectories(prefixPath) then begin
+      SaveStringToFile(logFileName, 'Success!' + chr(13) + chr(10) +
+                       '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
+    end
+    else begin
+      SaveStringToFile(logFileName, 'Directory could not be created!' + chr(13) + chr(10) +
+                       '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
+    end;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function installIoBroker: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
@@ -2328,6 +2363,8 @@ begin
       marqueePage.SetText(info, '');
       marqueePage.Show
       marqueePage.Animate
+
+      fixPrefixPath(LogName);
 
       // ioBroker.bat makes trouble when calling npx@iobroker..., delete it
       // Don't panic, fix will restore it anyway, and install will install it anyway
