@@ -1,6 +1,6 @@
 ﻿russian.Intro=ioBroker - это центральный сервер для умных домов и автоматизации.%n%nCioBroker вы получаете:%n- мощное, но простое в управлении решение от%n- удобный интерфейс%n- простая интеграция с существующими системами и службами%n- модульный дизайн%n- визуализация через Интернет%n- мобильный доступ%n- подключение к Alexa, Homekit многим другим системам умного дома%n- помощь от большого и активного сообщества%n%nioBroker - Automate your life%n%nInstaller Version {#MyAppVersion}
 russian.PortInUse=Порт %s уже используется процессом "%s", PID %s
-russian.PortAvailable=Порт %d ist vrfügbar
+russian.PortAvailable=Порт %d доступен
 russian.IoBrokerInstalled=Версия ioBroker %d.%d.%d установлена ​​в %s
 russian.IoBrokerNotInstalled=ioBroker не установлен в %s
 russian.NodeInstalled=Версия Node.js %d.%d.%d установлена ​​в %s

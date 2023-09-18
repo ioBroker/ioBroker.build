@@ -41,7 +41,6 @@ gulp.task('0-clean', done => {
     done();
 });
 gulp.task('3-0-replaceWindowsVersion', async () => {
-
     !fs.existsSync(`${__dirname}/build/.windows-ready`) && fs.mkdirSync(`${__dirname}/build/.windows-ready`);
 
     fs.writeFileSync(`${__dirname}/build/.windows-ready/version.txt`, `#define MyAppVersion "${version}"`);
@@ -97,7 +96,7 @@ function runMSI() {
         ])
             .then(() => {
                 // Install node modules
-                const cwd = __dirname.replace(/\\/g, '/') + '/build/windows/';
+                const cwd = `${__dirname.replace(/\\/g, '/')}/build/windows/`;
 
                 const cmd = `"${__dirname}\\build\\windows\\InnoSetup6\\ISCC.exe" "${__dirname}\\build\\windows\\ioBroker.iss"`;
                 console.log(`"${cmd} in ${cwd}`);
@@ -113,7 +112,7 @@ function runMSI() {
                 child.on('exit', (code /* , signal */) => {
                     // code 1 is strange error that cannot be explained. Everything is installed but error :(
                     if (code && code !== 1) {
-                        reject(new Error('Cannot install: ' + code));
+                        reject(new Error(`Cannot install: ${code}`));
                     } else {
                         console.log(`"${cmd} in ${cwd} finished.`);
                         // command succeeded

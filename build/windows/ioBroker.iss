@@ -9,7 +9,7 @@
 ; - 07.03.2023 Gaspode: Ensure that node path is set correctly when calling 'npx'              -
 ; - 08.03.2023 Gaspode: Implemented option to modify Windows firewall                          -
 ; - 10.03.2023 Gaspode: Layout optimizations                                                   -
-; - 18.03.2023 Gaspode: Refactored and optimzed code, cleanup                                  -
+; - 18.03.2023 Gaspode: Refactored and optimized code, cleanup                                  -
 ; - 21.03.2023 Gaspode: Support multi server installations in expert mode                      -
 ; - 22.03.2023 Gaspode: Copy the installer itself to ioBroker directory and create shortcut    -
 ; - 25.03.2023 Gaspode: Recognize stabilostick installation folder and abort installation      -
@@ -101,7 +101,7 @@ Name: "ukrainian"; MessagesFile: "compiler:Languages\Ukrainian.isl"
 #include "language\ukrainian.txt"
 
 [Run]
-Filename: http://localhost:{code:getIobAdminPortStr}/; Description: "{cm:OpenIoBrokerSettings}"; Flags: postinstall shellexec;  Check: success and not deinstalled
+Filename: http://localhost:{code:getIobAdminPortStr}/; Description: "{cm:OpenIoBrokerSettings}"; Flags: postinstall shellexec;  Check: success and not uninstalled
 Filename: {win}\explorer; Parameters: "{code:getIobPath}\log";Description: "{cm:OpenLogFileDirectory}"; Flags: postinstall shellexec;  Check: not success
 
 [UninstallRun]
@@ -214,13 +214,13 @@ var
   expertCB: TCheckBox;
 
 
-  // Progres pages
+  // Progress pages
   progressPage: TOutputProgressWizardPage;
   marqueePage: TOutputMarqueeProgressWizardPage;
 
-  readyToInstall: Boolean;            // True if all preconditions are fullfilled to start the installation/fix/other option
+  readyToInstall: Boolean;            // True if all preconditions are fulfilled to start the installation/fix/other option
   tryStopServiceAtNextRetry: Boolean; // True if the iob service shall be shut down when pressing Retry button
-  iobControllerFoundNoNode: Boolean;  // True, if iobroker jscontroller was found in the active path, but no Node.js softare installed
+  iobControllerFoundNoNode: Boolean;  // True, if iobroker js-controller was found in the active path, but no Node.js software installed
 
   nodePath: String;                       // Local Path to currently installed node.exe
   rcmdNodeDownloadPath: String;           // The path (URL) to the currently recommended Node.js MSI file
@@ -265,7 +265,7 @@ function reconfigureIoBrokerAdminPort(adminPort: Integer; logFileName: String): 
 function reconfigureIoBrokerServerName(serverName: String; logFileName: String): Boolean; forward;
 procedure retryTestReady(sender: TObject); forward;
 procedure expertOptionChanged(sender: TObject); forward;
-procedure updateExpertOptonsPage; forward;
+procedure updateExpertOptionsPage; forward;
 procedure updateExpertSettingsPage; forward;
 procedure keyPressServerName(sender: TObject; var key: Char); forward;
 procedure keyPressStatesPort(sender: TObject; var key: Char); forward;
@@ -2442,7 +2442,7 @@ begin
       Log(Format('taskkill /f /pid %d: ', [pid]) + output);
       SaveStringToFile(logFileName,
                        '----------------------------------------------' + chr(13) + chr(10) +
-                       'Killed task of servive ' + serviceName + '.exe:' + chr(13) + chr(10) +
+                       'Killed task of service ' + serviceName + '.exe:' + chr(13) + chr(10) +
                        output + chr(13) + chr(10), True);
       Result := True;
     end;
@@ -2535,7 +2535,7 @@ begin
     if (CurPageID = wpSelectDir) or
        ((CurPageID = wpWelcome) and not isFirstInstallerRun)
     then begin
-      updateExpertOptonsPage;
+      updateExpertOptionsPage;
     end;
     if CurPageID = expertOptionsPage.ID then begin
       if exoNewServerRB.Checked then begin
@@ -3084,7 +3084,7 @@ begin
     end;
     if i > 0 then begin
       msg :=  chr(13) + chr(10) + msg + chr(13) + chr(10) + chr(13) + chr(10);
-      // Inno Setup does not support CustomMessage for unistallation!?
+      // Inno Setup does not support CustomMessage for uninstallation!?
       // Implemented only German and english
       if activeLanguage = 'german' then begin
         MsgBox(Format('ioBroker kann nicht auf diese Weise deinstalliert werden, da im Expertenmodus folgende ioBroker Server installiert wurden:%sBitte starte den Installer und verwende den Expertenmodus, um ioBroker Server Installationen zu deinstallieren.', [msg]), mbError, mb_Ok or MB_SETFOREGROUND);
@@ -3468,7 +3468,7 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-procedure updateExpertOptonsPage;
+procedure updateExpertOptionsPage;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   curInstServiceName: String;
@@ -3763,7 +3763,7 @@ begin
     iobExpertPath := RemoveBackslash(dir);
     RegWriteStringValue(HKEY_LOCAL_MACHINE, expertRegServersRoot, 'RootPath', iobExpertPath );
   end;
-  updateExpertOptonsPage;
+  updateExpertOptionsPage;
 end;
 
 

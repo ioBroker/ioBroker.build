@@ -41,6 +41,7 @@ Pre-requires:
 6. The result will be stored in `d:\ioBroker.build\delivery` as `ioBrokerInstaller.VX.y.z.exe`
 
 ## Changelog
+- (bluefox) corrected some texts
 
 # 2.2.2 (17.07.2023)
 - (Gaspode) Workaround for Node installation bug. In case that prefix directory is not created, the installer will create it
