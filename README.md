@@ -4,7 +4,7 @@ Windows installer Build installation packages for ioBroker.
 
 Pre-requires:
 
-- Node JS with NPM
+- Node.js with NPM
 - Windows to build .exe
 - Internet connection, because the `nodejs` will be downloaded by gulp.
 
