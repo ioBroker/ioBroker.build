@@ -25,6 +25,7 @@
 ; -                     cancelled                                                              -
 ; - 16.07.2023 Gaspode: Workaround for Node installation bug. In case that prefix directory is -
 ; -                     not created, the installer will create it                              -
+; - 05.02.2024 Gaspode: Change detection of supported and recommended Node.js versions         -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -476,6 +477,35 @@ begin
             cnt := cnt+1;
             setArrayLength(values, cnt);
             values[cnt-1] := Output.Strings[foundArray[J].Index];
+          end;
+        end;
+        Result := True;
+        Exit;
+      end
+    end;
+  end;
+  Result := False;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function FindJsonIntArray(Output: TJsonParserOutput; Parent: TJsonObject; Key: TJsonString; var values: array of integer): Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  I: Integer;
+  J: Integer;
+  cnt: Integer;
+  foundArray: TJsonArray;
+begin
+  for I := 0 to Length(Parent) - 1 do begin
+    if Parent[I].Key = Key then begin
+      if (Parent[I].Value.Kind = JVKArray) then begin
+        foundArray := Output.Arrays[Parent[i].Value.Index];
+        cnt := 0;
+        for J := 0 to GetArrayLength(foundArray) -1 do begin
+          if foundArray[J].Kind = JVKNumber then begin
+            cnt := cnt+1;
+            setArrayLength(values, cnt);
+            values[cnt-1] := Round(Output.Numbers[foundArray[J].Index]);
           end;
         end;
         Result := True;
@@ -1105,6 +1135,7 @@ procedure gatherNodeData;
 var
   JsonParser: TJsonParser;
   jsonString: AnsiString;
+  nodeRecommendedNr: TJsonNumber;
   nodeRecommendedStr: String;
   nodeAcceptedStrings: TArrayOfString;
   nodeLatestList: TArrayOfString;
@@ -1120,7 +1151,7 @@ begin
   try
     if rcmdNodeVersionMajor = 0 then begin
       try
-        DownloadTemporaryFileAndCopy('https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.info/master/admin/lib/data/infoData.json', '~iobinfo.json', '', @OnDownloadProgress);
+        DownloadTemporaryFileAndCopy('https://raw.githubusercontent.com/ioBroker/ioBroker/master/versions.json', '~iobinfo.json', '', @OnDownloadProgress);
       except
         errorOccurred := True;
       end;
@@ -1129,17 +1160,16 @@ begin
         ClearJsonParser(JsonParser);
         ParseJson(JsonParser, jsonString);
         if Length(JsonParser.Output.Objects) > 0 then begin
-          if FindJsonStrValue(JsonParser.Output, JsonParser.Output.Objects[0], 'nodeRecommended', nodeRecommendedStr) then begin
-            Log('Node Recommended: '+nodeRecommendedStr);
+          if FindJsonNumber(JsonParser.Output, JsonParser.Output.Objects[0], 'nodeJsRecommended', nodeRecommendedNr) then begin
+            nodeRecommendedStr := IntToStr(Round(nodeRecommendedNr));
+            Log('Node Recommended: ' + nodeRecommendedStr);
             Log('->'+'https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt');
           end
           else begin
             errorOccurred := True;
           end;
-          FindJsonStrArray (JsonParser.Output, JsonParser.Output.Objects[0], 'nodeAccepted', nodeAcceptedStrings);
-          setArrayLength(acceptedNodeVersions, GetArrayLength(nodeAcceptedStrings));
-          for i:=0 to GetArrayLength(nodeAcceptedStrings)-1 do begin
-            acceptedNodeVersions[i] := StrToIntDef(Copy(nodeAcceptedStrings[i], 2, Length(nodeAcceptedStrings[i])-1), 0);
+          FindJsonIntArray (JsonParser.Output, JsonParser.Output.Objects[0], 'nodeJsAccepted', acceptedNodeVersions);
+          for i:=0 to GetArrayLength(acceptedNodeVersions)-1 do begin
             Log(Format('Node Accepted: %d',[acceptedNodeVersions[i]]));
           end;
         end
@@ -1153,10 +1183,10 @@ begin
       end;
 
       try
-        DownloadTemporaryFileAndCopy('https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt', '', @OnDownloadProgress);
+        DownloadTemporaryFileAndCopy('https://nodejs.org/dist/latest-v' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt', '', @OnDownloadProgress);
       except
         Log(GetExceptionMessage);
-        MsgBox(Format(CustomMessage('DownloadErrorGatherNode'), ['https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt']), mbError, MB_OK);
+        MsgBox(Format(CustomMessage('DownloadErrorGatherNode'), ['https://nodejs.org/dist/latest-v' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt']), mbError, MB_OK);
         Exit;
       end;
       if LoadStringsFromFile(getTempPath + '\~nodeInfo.txt', nodeLatestList) then begin
@@ -1176,7 +1206,7 @@ begin
               versionString := Copy(nodeLatestList[i], startPos+6, endPos-startPos-6);
               Log(nodeFileName);
               Log(versionString);
-              rcmdNodeDownloadPath := 'https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/' + nodeFileName;
+              rcmdNodeDownloadPath := 'https://nodejs.org/dist/latest-v' + nodeRecommendedStr + '.x/' + nodeFileName;
               Log(rcmdNodeDownloadPath);
               if (convertVersion(versionString, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch)) then begin
                 Log(Format('Recommended Node version: %d, %d, %d', [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]));

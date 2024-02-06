@@ -43,21 +43,29 @@ Pre-requires:
 ## Changelog
 - (bluefox) corrected some texts
 
+### **WORK IN PROGRESS**
+
+- (Gaspode) Change detection of supported and recommended Node.js versions
+
 # 2.2.2 (17.07.2023)
+
 - (Gaspode) Workaround for Node installation bug. In case that prefix directory is not created, the installer will create it
 
 # 2.2.1 (30.04.2023)
+
 - (Gaspode) Catch and handle several error conditions
 - (Gaspode) Use a location for temporary files which causes less problems
 - (Gaspode) Handle ampersand character properly when setting path variable
 
 # 2.2.0 (18.04.2023)
+
 - (Gaspode) Option added to set windows service startmode (auto, manual)
 - (Gaspode) Uninstall: keep iobroker-data, but rename it to iobroker-data_backup
 - (Gaspode) Allows changing the root folder for installations in expert mode
 - (Gaspode) Fixed firewall rules
 
 # 2.1.1 (30.03.2023)
+
 - (Gaspode) Layout optimizations
 - (Gaspode) Refactored and optimized code, cleanup
 - (Gaspode) Support multi server installations in expert mode
@@ -67,12 +75,15 @@ Pre-requires:
 - (Gaspode) Translations completed
 
 # 2.1.0 (09.03.2023)
+
 - (Gaspode) Implemented option to modify the Windows firewall
 - (Gaspode) Ensured that the node path was set correctly when calling `npx`
 
 # 2.0.0 (04.03.2023)
+
 - (Gaspode) Improved look & feel, improved error handling, added several checks, implemented more options
 - (Gaspode) added several languages
 
 # 1.1.0 (21.05.2022)
+
 - (bluefox) Initial release
