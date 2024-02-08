@@ -42,7 +42,7 @@ Pre-requires:
 
 ## Changelog
 
-### **WORK IN PROGRESS**
+# 3.0.0 (08.02.2024)
 
 - (Gaspode) Changed detection of supported and recommended Node.js versions
 - (Gaspode) Check for installer update at startup
