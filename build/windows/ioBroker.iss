@@ -27,6 +27,7 @@
 ; -                     not created, the installer will create it                              -
 ; - 05.02.2024 Gaspode: Change detection of supported and recommended Node.js versions         -
 ; - 07.02.2024 Gaspode: Check for installer update at startup                                  -
+; - 08.02.2024 Gaspode: Refactored and optimized code, cleanup                                 -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -35,6 +36,12 @@
 #define MyAppPublisher "ioBroker GmbH"
 #define MyAppURL "https://www.ioBroker.net/"
 #define MyAppIcon "ioBroker.ico"
+
+#define URL_IOB_VERSIONS_JSON 'https://raw.githubusercontent.com/ioBroker/ioBroker/master/versions.json'
+#define URL_NODEJS_LATEST_MAJOR 'https://nodejs.org/dist/latest-v%d.x/SHASUMS256.txt'
+#define URL_NODEJS_LATEST_FULL 'https://nodejs.org/dist/latest-v%d.x/%s'
+#define URL_IOB_BUILD_PACKAGE_JSON 'https://raw.githubusercontent.com/ioBroker/ioBroker.build/master/package.json'
+#define URL_INSTALLER_DOWNLOAD 'https://iobroker.live/images/win/iobroker-installer-%s.exe'
 
 #include "..\.windows-ready\version.txt"
 
@@ -1141,8 +1148,8 @@ procedure gatherNodeData;
 var
   JsonParser: TJsonParser;
   jsonString: AnsiString;
-  nodeRecommendedNr: TJsonNumber;
-  nodeRecommendedStr: String;
+  nodeRecommendedMajorNr: TJsonNumber;
+  nodeRecommendedMajorUrl: String;
   nodeLatestList: TArrayOfString;
   searchString: String;
   i: Integer;
@@ -1156,7 +1163,7 @@ begin
   try
     if rcmdNodeVersionMajor = 0 then begin
       try
-        DownloadTemporaryFileAndCopy('https://raw.githubusercontent.com/ioBroker/ioBroker/master/versions.json', '~iobinfo.json', '', @OnDownloadProgress);
+        DownloadTemporaryFileAndCopy(ExpandConstant('{#URL_IOB_VERSIONS_JSON}'), '~iobinfo.json', '', @OnDownloadProgress);
       except
         errorOccurred := True;
       end;
@@ -1165,10 +1172,10 @@ begin
         ClearJsonParser(JsonParser);
         ParseJson(JsonParser, jsonString);
         if Length(JsonParser.Output.Objects) > 0 then begin
-          if FindJsonNumber(JsonParser.Output, JsonParser.Output.Objects[0], 'nodeJsRecommended', nodeRecommendedNr) then begin
-            nodeRecommendedStr := IntToStr(Round(nodeRecommendedNr));
-            Log('Node Recommended: ' + nodeRecommendedStr);
-            Log('->'+'https://nodejs.org/dist/latest-' + nodeRecommendedStr + '.x/SHASUMS256.txt');
+          if FindJsonNumber(JsonParser.Output, JsonParser.Output.Objects[0], 'nodeJsRecommended', nodeRecommendedMajorNr) then begin
+            nodeRecommendedMajorUrl := Format(ExpandConstant('{#URL_NODEJS_LATEST_MAJOR}'), [Round(nodeRecommendedMajorNr)]);
+            Log(Format('Node Recommended: %d', [Round(nodeRecommendedMajorNr)]));
+            Log('->' + nodeRecommendedMajorUrl);
           end
           else begin
             errorOccurred := True;
@@ -1183,15 +1190,15 @@ begin
         end;
       end;
       if errorOccurred then begin
-        MsgBox(Format(CustomMessage('DownloadError'), ['https://raw.githubusercontent.com/ioBroker/ioBroker/master/versions.json']), mbError, MB_OK);
+        MsgBox(Format(CustomMessage('DownloadError'), [ExpandConstant('{#URL_IOB_VERSIONS_JSON}')]), mbError, MB_OK);
         Exit;
       end;
 
       try
-        DownloadTemporaryFileAndCopy('https://nodejs.org/dist/latest-v' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt', '', @OnDownloadProgress);
+        DownloadTemporaryFileAndCopy(nodeRecommendedMajorUrl, '~nodeInfo.txt', '', @OnDownloadProgress);
       except
         Log(GetExceptionMessage);
-        MsgBox(Format(CustomMessage('DownloadErrorGatherNode'), ['https://nodejs.org/dist/latest-v' + nodeRecommendedStr + '.x/SHASUMS256.txt', '~nodeInfo.txt']), mbError, MB_OK);
+        MsgBox(Format(CustomMessage('DownloadErrorGatherNode'), [nodeRecommendedMajorUrl, '~nodeInfo.txt']), mbError, MB_OK);
         Exit;
       end;
       if LoadStringsFromFile(getTempPath + '\~nodeInfo.txt', nodeLatestList) then begin
@@ -1211,7 +1218,7 @@ begin
               versionString := Copy(nodeLatestList[i], startPos+6, endPos-startPos-6);
               Log(nodeFileName);
               Log(versionString);
-              rcmdNodeDownloadPath := 'https://nodejs.org/dist/latest-v' + nodeRecommendedStr + '.x/' + nodeFileName;
+              rcmdNodeDownloadPath := Format( ExpandConstant('{#URL_NODEJS_LATEST_FULL}'),[Round(nodeRecommendedMajorNr), nodeFileName]);
               Log(rcmdNodeDownloadPath);
               if (convertVersion(versionString, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch)) then begin
                 Log(Format('Recommended Node version: %d, %d, %d', [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]));
@@ -2600,7 +2607,7 @@ begin
       infoLabel.Refresh
 
       fileName := '~package.json';
-      DownloadTemporaryFile('https://raw.githubusercontent.com/ioBroker/ioBroker.build/master/package.json', fileName, '', @OnDownloadProgress);
+      DownloadTemporaryFile(ExpandConstant('{#URL_IOB_BUILD_PACKAGE_JSON}'), fileName, '', @OnDownloadProgress);
 
       if FileExists(ExpandConstant('{tmp}') + '\' + fileName) then begin
         Log(ExpandConstant('{tmp}') + '\' + fileName + ' download: Success!');
@@ -2621,7 +2628,7 @@ begin
                  ((onlineMajor = installedMajor) and (onlineMinor > installedMinor)) or
                  ((onlineMajor = installedMajor) and (onlineMinor = installedMinor) and (onlinePatch > installedPatch))then begin
 
-                downloadPath :='https://iobroker.live/images/win/iobroker-installer-' + onlineVersionStr + '.exe';
+                downloadPath := Format(ExpandConstant('{#URL_INSTALLER_DOWNLOAD}'), [onlineVersionStr]);
                 infoForm.Hide
 
                 try

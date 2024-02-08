@@ -1,6 +1,6 @@
 {
   "name": "iobroker.build",
-  "version": "2.2.2",
+  "version": "3.0.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/ioBroker/ioBroker.build.git"
