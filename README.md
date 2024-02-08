@@ -41,11 +41,12 @@ Pre-requires:
 6. The result will be stored in `d:\ioBroker.build\delivery` as `ioBrokerInstaller.VX.y.z.exe`
 
 ## Changelog
-- (bluefox) corrected some texts
 
 ### **WORK IN PROGRESS**
 
-- (Gaspode) Change detection of supported and recommended Node.js versions
+- (Gaspode) Changed detection of supported and recommended Node.js versions
+- (Gaspode) Check for installer update at startup
+- (bluefox) Corrected some texts
 
 # 2.2.2 (17.07.2023)
 

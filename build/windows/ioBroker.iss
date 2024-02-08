@@ -9,7 +9,7 @@
 ; - 07.03.2023 Gaspode: Ensure that node path is set correctly when calling 'npx'              -
 ; - 08.03.2023 Gaspode: Implemented option to modify Windows firewall                          -
 ; - 10.03.2023 Gaspode: Layout optimizations                                                   -
-; - 18.03.2023 Gaspode: Refactored and optimized code, cleanup                                  -
+; - 18.03.2023 Gaspode: Refactored and optimized code, cleanup                                 -
 ; - 21.03.2023 Gaspode: Support multi server installations in expert mode                      -
 ; - 22.03.2023 Gaspode: Copy the installer itself to ioBroker directory and create shortcut    -
 ; - 25.03.2023 Gaspode: Recognize stabilostick installation folder and abort installation      -
@@ -26,6 +26,7 @@
 ; - 16.07.2023 Gaspode: Workaround for Node installation bug. In case that prefix directory is -
 ; -                     not created, the installer will create it                              -
 ; - 05.02.2024 Gaspode: Change detection of supported and recommended Node.js versions         -
+; - 07.02.2024 Gaspode: Check for installer update at startup                                  -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -258,6 +259,9 @@ var
   installationSuccessful: Boolean; // True if the installation was successful
 
   expertRegServersRoot: String; // Root path in registry for server information (expert mode only)
+  registryPendingDeleteKey: String; // Root path in registry for removal of downloaded installer executable, if newer version was downloaded
+
+  updatedInstallerStarted: Boolean; // True, if a new installer was downloaded and started, otherwise false;
 
 procedure gatherInstNodeData; forward;
 function reconfigureIoBroker(info: String; logFileName: String): Boolean; forward;
@@ -338,7 +342,9 @@ function DownloadTemporaryFileAndCopy(const Url, FileName, RequiredSHA256OfFile:
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   Result := DownloadTemporaryFile(Url, FileName, RequiredSHA256OfFile, OnDownloadProgress);
-  FileCopy(ExpandConstant('{tmp}') + '\' + FileName, getTempPath + '\' + FileName, False);
+  if FileCopy(ExpandConstant('{tmp}') + '\' + FileName, getTempPath + '\' + FileName, False) then begin
+    Log('Copied downloaded file to ' + getTempPath + '\' + FileName);
+  end;
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -349,7 +355,7 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function deinstalled: Boolean;
+function uninstalled: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   Result := expertCB.Checked and exoUninstallServerRB.Checked;
@@ -784,7 +790,7 @@ function OnDownloadProgress(const Url, FileName: String; const Progress, Progres
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   if Progress = ProgressMax then
-    Log(Format('Successfully downloaded file to %s: %s', [getTempPath, FileName]));
+    Log(Format('Successfully downloaded file to %s: %s', [ExpandConstant('{tmp}'), FileName]));
   Result := True;
 end;
 
@@ -794,7 +800,7 @@ function OnDownloadProgressNode(const Url, FileName: String; const Progress, Pro
 begin
   progressPage.SetProgress(Progress, ProgressMax);
   if Progress = ProgressMax then
-    Log(Format('Successfully downloaded file to %s: %s', [getTempPath, FileName]));
+    Log(Format('Successfully downloaded file to %s: %s', [ExpandConstant('{tmp}'), FileName]));
   Result := True;
 end;
 
@@ -1137,7 +1143,6 @@ var
   jsonString: AnsiString;
   nodeRecommendedNr: TJsonNumber;
   nodeRecommendedStr: String;
-  nodeAcceptedStrings: TArrayOfString;
   nodeLatestList: TArrayOfString;
   searchString: String;
   i: Integer;
@@ -1178,7 +1183,7 @@ begin
         end;
       end;
       if errorOccurred then begin
-        MsgBox(Format(CustomMessage('DownloadError'), ['https://raw.githubusercontent.com/iobroker-community-adapters/ioBroker.info/master/admin/lib/data/infoData.json']), mbError, MB_OK);
+        MsgBox(Format(CustomMessage('DownloadError'), ['https://raw.githubusercontent.com/ioBroker/ioBroker/master/versions.json']), mbError, MB_OK);
         Exit;
       end;
 
@@ -2505,11 +2510,191 @@ end;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 procedure DeinitializeSetup;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  fileNameToDelete: String;
+  batchConent: String;
+  batchFileName: String;
+  resultCode: Integer;
 begin
-  if (Length(getTempPathName) > 5) and (Length(iobHomePath) > 3) then begin
+  if (Length(iobHomePath) > 3) and (Length(getTempPathName) > 5) then begin
     DelTree(getTempPath, True, True, True);
     if isDirectoryEmpty(iobHomePath) then begin
       DelTree(iobHomePath, True, False, False);
+    end;
+  end;
+
+  if not updatedInstallerStarted then begin
+    if RegKeyExists(HKEY_LOCAL_MACHINE, registryPendingDeleteKey ) then begin
+      if RegQueryStringValue(HKEY_LOCAL_MACHINE, registryPendingDeleteKey, 'Executable', fileNameToDelete) then begin
+        if Length(fileNameToDelete) > 5 then begin
+          Log('Deleting file ' + fileNameToDelete);
+          // We have to trick here to ensure that the temporary file is really deleted because it is locked by the current process:
+          batchConent := ':try_delete' + #13 + #10 +
+                'del "' + fileNameToDelete + '"' + #13 + #10 +
+                'if exist "' + fileNameToDelete + '" goto try_delete' + #13 + #10 +
+                'del %0';
+
+          batchFileName := ExtractFilePath(ExpandConstant('{tmp}')) + 'removeTmpInstaller.bat';
+          SaveStringToFile(batchFileName, batchConent, False);
+          Exec(batchFileName, '', '', SW_HIDE, ewNoWait, resultCode);
+          RegDeleteKeyIncludingSubkeys(HKEY_LOCAL_MACHINE, registryPendingDeleteKey);
+        end;
+      end;
+    end;
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function InitializeSetup: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  infoForm: TSetupForm;
+  infoLabel: TLabel;
+  jsonParser: TJsonParser;
+  jsonString: AnsiString;
+  resultCode: Integer;
+  fileName: String;
+  downloadPath: String;
+  downloadSize: Integer;
+  tmpExecFinalPath: String;
+  tmpExecTmpName: String;
+  tmpExecTmpPath: String;
+  onlineVersionStr: String;
+  installedVersionStr: String;
+  onlineMajor: Integer;
+  onlineMinor: Integer;
+  onlinePatch: Integer;
+  installedMajor: Integer;
+  installedMinor: Integer;
+  installedPatch: Integer;
+begin
+  Result := True;
+  updatedInstallerStarted := False;
+
+  registryPendingDeleteKey := 'Software\ioBroker\pendingDelete';
+
+  if not RegKeyExists(HKEY_LOCAL_MACHINE, registryPendingDeleteKey ) then begin
+    // Check for installer update:
+    // If any error occurs we go on silently, because there is no need to bother the user with info about a failed update check.
+    try
+      infoForm := CreateCustomForm;
+      with infoForm do begin
+        ClientWidth := ScaleX(250);
+        ClientHeight := ScaleY(100);
+        Caption := 'ioBroker - Automate your life';
+        Position := poMainFormCenter;
+        Color := clWhite;
+      end;
+      infoLabel := TLabel.Create(infoForm);
+      with infoLabel do begin
+        Top := ScaleY(40);
+        Left := ScaleX(10);
+        Height := ScaleY(20);
+        Width := ScaleX(230);
+        Anchors := [akLeft, akTop, akRight];
+        Caption := CustomMessage('CheckingForUpdates');
+        Alignment := taCenter;
+        Parent := infoForm;
+      end;
+      infoForm.Show
+      infoLabel.Refresh
+
+      fileName := '~package.json';
+      DownloadTemporaryFile('https://raw.githubusercontent.com/ioBroker/ioBroker.build/master/package.json', fileName, '', @OnDownloadProgress);
+
+      if FileExists(ExpandConstant('{tmp}') + '\' + fileName) then begin
+        Log(ExpandConstant('{tmp}') + '\' + fileName + ' download: Success!');
+        LoadStringFromFile(ExpandConstant('{tmp}') + '\' + fileName, jsonString);
+        ClearJsonParser(jsonParser);
+        ParseJson(JsonParser, jsonString);
+        if Length(jsonParser.Output.Objects) > 0 then begin
+
+          if FindJsonStrValue(jsonParser.Output, JsonParser.Output.Objects[0], 'version', onlineVersionStr) then begin
+            installedVersionStr := '{#SetupSetting("AppVersion")}';
+            Log('Update check: Found Online Installer version: ' + onlineVersionStr);
+            Log('Update check: Installed Installer version: ' + installedVersionStr);
+
+            if convertVersion(onlineVersionStr, onlineMajor, onlineMinor, onlinePatch) and
+               convertVersion(installedVersionStr, installedMajor, installedMinor, installedPatch) then begin
+
+              if (onlineMajor > installedMajor) or
+                 ((onlineMajor = installedMajor) and (onlineMinor > installedMinor)) or
+                 ((onlineMajor = installedMajor) and (onlineMinor = installedMinor) and (onlinePatch > installedPatch))then begin
+
+                downloadPath :='https://iobroker.live/images/win/iobroker-installer-' + onlineVersionStr + '.exe';
+                infoForm.Hide
+
+                try
+                  downloadSize := DownloadTemporaryFileSize(downloadPath);
+                except
+                  downloadSize := 0;
+                end;
+
+                if(downloadSize > 0) then begin
+                  // New Installer detected!
+                  if MsgBox(Format(CustomMessage('DownloadInstallerAndInstall'), [onlineVersionStr,installedVersionStr]), mbConfirmation, mb_YesNo or MB_SETFOREGROUND) = IDYES then begin
+                    try
+                      infoLabel.Caption := Format(CustomMessage('DownloadingInstaller'), [onlineVersionStr]);;
+                      infoForm.Show
+                      infoLabel.Refresh
+
+                      tmpExecTmpName := '~iobInst.exe';
+                      tmpExecTmpPath := ExpandConstant('{tmp}') + '\' + tmpExecTmpName;
+                      DownloadTemporaryFile(downloadPath, tmpExecTmpName, '', @OnDownloadProgress);
+                      infoForm.Hide
+
+                      if FileExists(tmpExecTmpPath) then begin
+                        tmpExecFinalPath := ExpandConstant('{%TEMP}') + '\~iobInst' + installedVersionStr + '#' + onlineVersionStr + '.exe';
+
+                        //
+                        if (FileCopy(tmpExecTmpPath, tmpExecFinalPath, False)) and (FileExists(tmpExecFinalPath)) then begin
+                          Log('Update check: Temporary Installer file at ' + tmpExecFinalPath);
+
+                          MsgBox(Format(CustomMessage('StartInstaller'), [onlineVersionStr]), mbConfirmation, mb_OK or MB_SETFOREGROUND);
+                          if Exec(tmpExecFinalPath, '', '', SW_SHOW, ewNoWait, resultCode) then begin
+                            RegWriteStringValue(HKEY_LOCAL_MACHINE, registryPendingDeleteKey, 'Executable',  tmpExecFinalPath);
+                            updatedInstallerStarted := True;
+                            // Stop this instance of the installer, the new instance has already been started
+                            Result := False;
+                          end
+                          else begin
+                            // Exec failed
+                            MsgBox(Format(CustomMessage('InstallerUpdateFailed'), [1]), mbConfirmation, mb_OK or MB_SETFOREGROUND);
+                          end
+                        end
+                        else begin
+                          // Copy Download File failed
+                          MsgBox(Format(CustomMessage('InstallerUpdateFailed'), [2]), mbConfirmation, mb_OK or MB_SETFOREGROUND);
+                        end;
+                      end
+                      else begin
+                        // Download failed
+                        MsgBox(Format(CustomMessage('InstallerUpdateFailed'), [3]), mbConfirmation, mb_OK or MB_SETFOREGROUND);
+                      end;
+                    except
+                      // Download/Copy failed
+                      MsgBox(Format(CustomMessage('InstallerUpdateFailed'), [4]), mbConfirmation, mb_OK or MB_SETFOREGROUND);
+                    end;
+                  end;
+                end
+                else begin
+                  Log('Update check failed: New version found, but no download file found!');
+                end;
+              end;
+            end
+            else begin
+              Log('Update check failed: Error in versions!');
+            end;
+          end;
+        end;
+      end
+      else begin
+        Log('Update check failed: ' + ExpandConstant('{tmp}') + '\' + fileName + ' download: No file!');
+      end;
+    except
+      Log('Update check failed: Exception occurred!');
+    finally
+      infoForm.Free
     end;
   end;
 end;
