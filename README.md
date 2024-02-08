@@ -31,13 +31,6 @@ Pre-requires:
    >npm run build
 ```
 
-5. To finish `.exe` build, go to `d:\ioBroker.build\build\.windows-ready` and call `createSetup.bat`
-
-```
-   >cd build\.windows-ready
-   >createSetup.bat
-```
-
 6. The result will be stored in `d:\ioBroker.build\delivery` as `ioBrokerInstaller.VX.y.z.exe`
 
 ## Changelog

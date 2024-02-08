@@ -1,5 +1,4 @@
 const gulp = require('gulp');
-const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const version = require('./package.json').version;
@@ -24,51 +23,17 @@ function deleteFoldersRecursive(path, exceptions) {
     }
 }
 
-function download(url, file) {
-    const directoryName = path.dirname(file);
-    if (!fs.existsSync(directoryName)) {
-        fs.mkdirSync(directoryName);
-    }
-
-    return axios(url, {responseType: 'arraybuffer'})
-        .then(response => fs.writeFileSync(file, response.data));
-}
-
 gulp.task('0-clean', done => {
     deleteFoldersRecursive(`${__dirname}/tmp`);
     deleteFoldersRecursive(`${__dirname}/build/.windows-ready`);
     deleteFoldersRecursive(`${__dirname}/delivery`);
     done();
 });
-gulp.task('3-0-replaceWindowsVersion', async () => {
+gulp.task('3-0-writeWindowsVersion', async () => {
     !fs.existsSync(`${__dirname}/build/.windows-ready`) && fs.mkdirSync(`${__dirname}/build/.windows-ready`);
-
     fs.writeFileSync(`${__dirname}/build/.windows-ready/version.txt`, `#define MyAppVersion "${version}"`);
-
-    fs.writeFileSync(`${__dirname}/build/.windows-ready/createSetup.bat`, `"${__dirname}/build/windows/InnoSetup6/ISCC.exe" "${__dirname}/build/.windows-ready/ioBroker.iss"`);
 });
 
-gulp.task('3-1-copy', async () =>
-    gulp.src([
-        'build/windows/*.js',
-        'build/windows/*.json',
-        'build/windows/*.iss',
-        '!service_ioBroker.bat',
-        '!_service_ioBroker.bat'
-    ])
-        .pipe(gulp.dest('build/.windows-ready')));
-
-gulp.task('3-1-copy-res', async () =>
-    gulp.src([
-        'build/windows/resource/*'
-    ])
-        .pipe(gulp.dest('build/.windows-ready/resource')));
-
-gulp.task('3-1-copy-lang', async () =>
-    gulp.src([
-        'build/windows/language/*'
-    ])
-        .pipe(gulp.dest('build/.windows-ready/language')));
 
 function _checkFiles(files, callback, index) {
     index = index || 0;
@@ -91,8 +56,8 @@ function checkFiles(files) {
 function runMSI() {
     return new Promise((resolve, reject) => {
         checkFiles([
-            'build/.windows-ready/ioBroker.iss',
-            'build/.windows-ready/resource/ioBroker.ico'
+            'build/windows/ioBroker.iss',
+            'build/windows/resource/ioBroker.ico'
         ])
             .then(() => {
                 // Install node modules
@@ -186,12 +151,12 @@ gulp.task('3-4-rename', async () => {
     if (fs.existsSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`) && fs.existsSync(`${__dirname}/delivery/iobroker-installer.exe`)) {
         fs.unlinkSync(`${__dirname}/delivery/iobroker-installer.exe`);
     }
-    fs.renameSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`, `${__dirname}/delivery/iobroker-installer.exe`);
+    fs.renameSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`, `${__dirname}/delivery/iobroker-installer-${version}.exe`);
 });
 gulp.task('3-5-signExe-manually', signExe);
 
 if (/^win/.test(process.platform)) {
-    gulp.task('3-windows-msi', gulp.series(['3-0-replaceWindowsVersion', '3-1-copy', '3-1-copy-res', '3-1-copy-lang', '3-3-runMSI', '3-4-rename']));
+    gulp.task('3-windows-msi', gulp.series(['3-0-writeWindowsVersion', '3-3-runMSI', '3-4-rename']));
 } else {
     gulp.task('3-windows-msi', async () => console.warn('Cannot create windows setup, while host is not windows'));
 }
