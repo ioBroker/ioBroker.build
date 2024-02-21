@@ -139,7 +139,7 @@ function signExe() {
                         console.log(`"${cmd.replace(process.env.CERT_PASSWORD, `*****${(process.env.CERT_PASSWORD || '').length + 5}`)}" finished successfully.`);
                         // rename to iobroker-installer-${version}.exe and to iobroker-installer-latest.exe
                         fs.renameSync(`${__dirname}/delivery/iobroker-installer.exe`, `${__dirname}/delivery/iobroker-installer.${version}.exe`);
-                        fs.copyFileSync(`${__dirname}/delivery/iobroker-installer.${version}.exe`, `${__dirname}/delivery/iobroker-installer-latest.exe`);
+                        fs.copyFileSync(`${__dirname}/delivery/iobroker-installer.${version}.exe`, `${__dirname}/delivery/iobroker-latest-windows-installer.exe`);
                         // command succeeded
                         resolve();
                     }
