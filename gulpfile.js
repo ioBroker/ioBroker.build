@@ -115,7 +115,7 @@ function signExe() {
                 console.log(`"${cmd.replace(process.env.CERT_PASSWORD, `*****${(process.env.CERT_PASSWORD || '').length + 5}`)}`);
 
                 // System call used for update of js-controller itself,
-                // because during installation npm packet will be deleted too, but some files must be loaded even during the installation process.
+                // because during an installation the npm packet will be deleted too, but some files must be loaded even during the installation process.
                 const exec = require('child_process').exec;
                 const child = exec(cmd);
 
@@ -123,7 +123,7 @@ function signExe() {
                 child.stdout.pipe(process.stdout);
 
                 child.on('exit', (code /* , signal */) => {
-                    // code 1 is strange error that cannot be explained. Everything is installed but error :(
+                    // code 1 is a strange error that cannot be explained. Everything is installed but error :(
                     if (code) {
                         const exitCodes = [
                             '0 = Success',
@@ -137,6 +137,9 @@ function signExe() {
                         reject(new Error(`Cannot sign: ${exitCodes[code]} (${code})`));
                     } else {
                         console.log(`"${cmd.replace(process.env.CERT_PASSWORD, `*****${(process.env.CERT_PASSWORD || '').length + 5}`)}" finished successfully.`);
+                        // rename to iobroker-installer-${version}.exe and to iobroker-installer-latest.exe
+                        fs.renameSync(`${__dirname}/delivery/iobroker-installer.exe`, `${__dirname}/delivery/iobroker-installer.${version}.exe`);
+                        fs.copyFileSync(`${__dirname}/delivery/iobroker-installer.${version}.exe`, `${__dirname}/delivery/iobroker-installer-latest.exe`);
                         // command succeeded
                         resolve();
                     }
@@ -151,7 +154,7 @@ gulp.task('3-4-rename', async () => {
     if (fs.existsSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`) && fs.existsSync(`${__dirname}/delivery/iobroker-installer.exe`)) {
         fs.unlinkSync(`${__dirname}/delivery/iobroker-installer.exe`);
     }
-    fs.renameSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`, `${__dirname}/delivery/iobroker-installer-${version}.exe`);
+    fs.renameSync(`${__dirname}/delivery/ioBrokerInstaller.${version}.exe`, `${__dirname}/delivery/iobroker-installer.exe`);
 });
 gulp.task('3-5-signExe-manually', signExe);
 
