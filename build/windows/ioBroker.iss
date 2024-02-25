@@ -28,6 +28,7 @@
 ; - 05.02.2024 Gaspode: Change detection of supported and recommended Node.js versions         -
 ; - 07.02.2024 Gaspode: Check for installer update at startup                                  -
 ; - 08.02.2024 Gaspode: Refactored and optimized code, cleanup                                 -
+; - 25.02.2024 Gaspode: Cosmetic change for specific screen resolutions or scaling settings    -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -3174,6 +3175,7 @@ begin
   expertRegServersRoot := 'Software\ioBroker\Installer\Servers\';
 
   // Display own welcome page text
+  WizardForm.WelcomeLabel2.height := WizardForm.height;
   WizardForm.WelcomeLabel2.Caption := CustomMessage('Intro');
   WizardForm.WizardBitmapImage.OnDblClick := @showExpertMode;
 

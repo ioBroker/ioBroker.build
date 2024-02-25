@@ -35,6 +35,10 @@ Pre-requires:
 
 ## Changelog
 
+# 3.0.1 (25.02.2024)
+
+- (Gaspode) Cosmetic change for specific screen resolutions or scaling settings
+
 # 3.0.0 (08.02.2024)
 
 - (Gaspode) Changed detection of supported and recommended Node.js versions
