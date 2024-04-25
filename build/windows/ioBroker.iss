@@ -29,6 +29,7 @@
 ; - 07.02.2024 Gaspode: Check for installer update at startup                                  -
 ; - 08.02.2024 Gaspode: Refactored and optimized code, cleanup                                 -
 ; - 25.02.2024 Gaspode: Cosmetic change for specific screen resolutions or scaling settings    -
+; - 25.04.2024 Gaspode: Logging enhanced                                                       -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -654,6 +655,11 @@ begin
   else begin
     logPart := '';
   end;
+
+  SaveStringToFile(myLogFileName, chr(13) + chr(10) + 'Executing:' + chr(13) + chr(10) + 
+                                  '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                                  myCmd + chr(13) + chr(10) +
+                                  '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), true);
 
   if (SaveStringToFile(tmpBatFileName, myCmd, false)) then begin
     if (Exec(ExpandConstant('{cmd}'), '/C ' + tmpBatFileName + logPart, wrkDir, SW_HIDE, ewWaitUntilTerminated, resultCode)) then begin
@@ -2339,7 +2345,7 @@ begin
   if dirExists(prefixPath) then begin
     SaveStringToFile(logFileName,
                      '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
-                     'Npm prefix path exists: ' + prefixPath + chr(13) + chr(10) +
+                     'Npm prefix path exists: ' + prefixPath + ' ---> OK' + chr(13) + chr(10) +
                      '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
   end
   else begin

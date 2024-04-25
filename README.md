@@ -35,6 +35,10 @@ Pre-requires:
 
 ## Changelog
 
+### **WORK IN PROGRESS**
+
+- (Gaspode) Logging enhanced
+
 # 3.0.1 (25.02.2024)
 
 - (Gaspode) Cosmetic change for specific screen resolutions or scaling settings
