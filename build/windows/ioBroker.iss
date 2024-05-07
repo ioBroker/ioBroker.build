@@ -30,6 +30,9 @@
 ; - 08.02.2024 Gaspode: Refactored and optimized code, cleanup                                 -
 ; - 25.02.2024 Gaspode: Cosmetic change for specific screen resolutions or scaling settings    -
 ; - 25.04.2024 Gaspode: Logging enhanced                                                       -
+; - 07.05.2024 Gaspode: Fixed: Checking Admin port after installation fails if Node.js was not -
+;                       installed when the installation started                                -
+; - 07.05.2024 Gaspode: Update/Upgrade of JS-Controller implemented                            -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -169,6 +172,7 @@ var
   sumInfo3NodeLabel: TLabel;
   sumInfo1IoBrokerLabel: TLabel;
   sumInfo2IoBrokerLabel: TLabel;
+  sumInfo2IoBrokerNewestLabel: TLabel;
   sumInfo1IoBrokerRunLabel: TLabel;
   sumInfo2IoBrokerRunLabel: TLabel;
   sumInfo1PortStatesLabelA: TLabel;
@@ -257,9 +261,13 @@ var
 
   iobTargetServiceName: String;  // The target service name of the currently to be installed iob server installation
 
-  iobVersionMajor: Integer;  // Major Version of the  currently handled iob server installation
-  iobVersionMinor: Integer;  // Minor Version of the  currently handled iob server installation
-  iobVersionPatch: Integer;  // Patch Version of the  currently handled iob server installation
+  iobVersionMajor: Integer;  // Major Version of the currently handled iob server installation
+  iobVersionMinor: Integer;  // Minor Version of the currently handled iob server installation
+  iobVersionPatch: Integer;  // Patch Version of the currently handled iob server installation
+
+  iobVersionNewMajor: Integer;  // Major Version of the currently available iob server version
+  iobVersionNewMinor: Integer;  // Minor Version of the currently available iob server version
+  iobVersionNewPatch: Integer;  // Patch Version of the currently available iob server version
 
   iobServiceExists: Boolean;     // True if a windows service with service name 'iobServiceName' already exists
   iobInstalled: Boolean;         // True if an ioBroker installation was found and verified in the currently handled path
@@ -292,6 +300,7 @@ procedure showExpertMode(sender: TObject); forward;
 procedure expertModeCBClicked(sender: TObject); forward;
 function expertInstallationExists: Boolean; forward;
 procedure expertSelectDirectory(sender: TObject); forward;
+function getIobAdminPort(iobPath: String): Integer; forward;
 
 {++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  Helper functions for the [xyz] sections of inno setup
@@ -591,6 +600,32 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function compareVersions(major1: Integer; minor1: Integer; patch1: Integer; major2: Integer; minor2: Integer; patch2: Integer): Integer;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  if major1 = major2 then
+  begin
+      if minor1 = minor2 then
+      begin
+          if patch1 = patch2 then
+              Result := 0
+          else if patch1 < patch2 then
+              Result := -1
+          else
+              Result := 1;
+      end
+      else if minor1 < minor2 then
+          Result := -1
+      else
+          Result := 1;
+  end
+  else if major1 < major2 then
+    Result := -1
+  else
+    Result := 1;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function execAndReturnOutput(myCmd: String; allLines: Boolean; addPath: String; wrkDir: String): String;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
@@ -656,7 +691,7 @@ begin
     logPart := '';
   end;
 
-  SaveStringToFile(myLogFileName, chr(13) + chr(10) + 'Executing:' + chr(13) + chr(10) + 
+  SaveStringToFile(myLogFileName, chr(13) + chr(10) + 'Executing:' + chr(13) + chr(10) +
                                   '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
                                   myCmd + chr(13) + chr(10) +
                                   '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), true);
@@ -770,6 +805,13 @@ begin
   end;
 end;
 
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function isIobUpdate: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := (optInstallIoBrokerCB.Checked = True) and (iobVersionNewMajor > 0);
+end;
+
 {++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  Logfile names
  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
@@ -786,6 +828,13 @@ function getLogNameIoBrokerInstall: String;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   Result := appInstPath + '\log\installIoBroker.log';
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getLogNameIoBrokerUpdate: String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := appInstPath + '\log\updateIoBroker.log';
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -826,7 +875,8 @@ end;
 function ioBrokerNeedsStart: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
-  Result := (optInstallIoBrokerCB.Checked = False) and (optFixIoBrokerCB.Checked = False);
+  Result := (optInstallIoBrokerCB.Checked = False) and (optFixIoBrokerCB.Checked = False) or
+            isIobUpdate;
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -909,6 +959,12 @@ begin
     if iobServiceOK then break;
   end;
   if iobServiceOK then begin
+    // If Node.js was not installed at the beginning, the Admin port is probably 0.
+    // In this case we try to fetch it again:
+    if iobAdminPort = 0 then begin
+      if nodepath = '' then gatherInstNodeData;
+      iobAdminPort := getIobAdminPort(appInstPath);
+    end;
     Log('ioBroker service was started!');
     marqueePage.SetText(info, CustomMessage('WaitForAdmin'));
     for i := 0 to 100 do begin
@@ -952,6 +1008,40 @@ begin
   end;
 end;
 
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+procedure gatherNewestIoBrokerVersion(var major: Integer; var minor: Integer; var patch: Integer);
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  versionString: String;
+  nodeJsEx: String;
+  ioBrokerEx: String;
+  curPos: Integer;
+begin
+  major := 0;
+  minor := 0;
+  patch := 0;
+  if (nodePath <> '') then begin
+    nodeJsEx := nodePath + '\node.exe';
+    ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
+    versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" update | find "Controller ""js-controller"":"', True, nodePath, '');
+    if (versionString <> '') then begin
+      curPos := 29; // |Controller "js-controller": |
+      versionString := Trim(Copy(versionString, curPos, Length(versionString) - curPos));
+      curPos := pos(' ', versionString);
+      if (curPos > 0) then begin
+        versionString := Trim(Copy(versionString, 1, curPos-1));
+        Log(Format('Latest ioBroker version: %s', [versionString]));
+        convertVersion(versionString, major, minor, patch);
+        Log(Format('Latest ioBroker version: %d, %d, %d', [major, minor, patch]));
+      end;
+    end
+    else begin
+      Log('Latest ioBroker version could not be detected!');
+    end;
+  end;
+end;
+
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function gatherIoBrokerInfo: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -965,6 +1055,10 @@ begin
   iobVersionMinor := 0;
   iobVersionPatch := 0;
 
+  iobVersionNewMajor := 0;
+  iobVersionNewMinor := 0;
+  iobVersionNewPatch := 0;
+
   ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
   if (FileExists(ioBrokerEx)) then begin
     Result := True;
@@ -973,7 +1067,8 @@ begin
       versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" --version', False, nodePath, '');
       if (convertVersion(versionString, iobVersionMajor, iobVersionMinor, iobVersionPatch)) then begin
         Log(Format('Found ioBroker version: %d, %d, %d', [iobVersionMajor, iobVersionMinor, iobVersionPatch]));
-      end
+        gatherNewestIoBrokerVersion(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch);
+      end;
     end
     else begin
       iobControllerFoundNoNode := True;
@@ -1335,24 +1430,26 @@ begin
   end;
   progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
 
-  portInfo := getPortInfo(adminPort);
-  if portInfo <> '' then begin
-    explode(portInfoArray, portInfo, ';');
-    sumInfo1PortAdminLabelA.Font.Color := clRed;
-    sumInfo1PortAdminLabelA.Caption := '⚠';
-    if GetArrayLength(portInfoArray) >= 3 then begin
-      sumInfo2PortAdminLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+  if adminPort > 0 then begin // If Node.js is not installed, the Admin port cannot be determined. We do not display it in this case
+    portInfo := getPortInfo(adminPort);
+    if portInfo <> '' then begin
+      explode(portInfoArray, portInfo, ';');
+      sumInfo1PortAdminLabelA.Font.Color := clRed;
+      sumInfo1PortAdminLabelA.Caption := '⚠';
+      if GetArrayLength(portInfoArray) >= 3 then begin
+        sumInfo2PortAdminLabelA.Caption := Format(CustomMessage('PortInUse'), [portInfoArray[0], portInfoArray[1], portInfoArray[2]]);
+      end
+      else begin
+        sumInfo2PortAdminLabelA.Caption := Format('<unknown> %s', [portInfo]);
+      end;
+      readyToInstall := False;
+      portsInUse := True;
     end
     else begin
-      sumInfo2PortAdminLabelA.Caption := Format('<unknown> %s', [portInfo]);
+      sumInfo1PortAdminLabelA.Font.Color := clGreen;
+      sumInfo1PortAdminLabelA.Caption := '✓';
+      sumInfo2PortAdminLabelA.Caption := Format(CustomMessage('PortAvailable'), [adminPort]);
     end;
-    readyToInstall := False;
-    portsInUse := True;
-  end
-  else begin
-    sumInfo1PortAdminLabelA.Font.Color := clGreen;
-    sumInfo1PortAdminLabelA.Caption := '✓';
-    sumInfo2PortAdminLabelA.Caption := Format(CustomMessage('PortAvailable'), [adminPort]);
   end;
   progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
 end;
@@ -1461,7 +1558,7 @@ begin
   summaryText := '';
   portsInUse := False;
   readyToInstall := True;
-  maxProgress := 12;
+  maxProgress := 8;
   progress := 0;
 
   tryStopServiceAtNextRetry := False;
@@ -1493,14 +1590,14 @@ begin
     sumInfo2NodeLabel.Caption := CustomMessage('NodeNotInstalled');
   end
   else begin
-    if instNodeVersionMajor = rcmdNodeVersionMajor then begin
+    if (compareVersions(instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch) = 0) then begin
       sumInfo1NodeLabel.Font.Color := clGreen;
       sumInfo1NodeLabel.Caption := '✓';
       sumInfo2NodeLabel.Caption := Format(CustomMessage('NodeInstalled'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, nodePath]);
     end
     else begin
       if isNodeVersionSupported(instNodeVersionMajor) then begin
-        sumInfo1NodeLabel.Font.Color := clYellow;
+        sumInfo1NodeLabel.Font.Color := $00A5FF;
         sumInfo1NodeLabel.Caption := '⚠';
         sumInfo2NodeLabel.Caption := Format(CustomMessage('NodeInstalled'), [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, nodePath]);
       end
@@ -1527,9 +1624,32 @@ begin
     end
   end
   else begin
-    sumInfo1IoBrokerLabel.Font.Color := clGreen;
-    sumInfo1IoBrokerLabel.Caption := '✓';
+    if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionMajor, iobVersionMinor, iobVersionPatch) > 0) then begin
+      sumInfo1IoBrokerLabel.Font.Color := $00A5FF;
+      sumInfo1IoBrokerLabel.Caption := '⚠';
+    end
+    else begin
+      sumInfo1IoBrokerLabel.Font.Color := clGreen;
+      sumInfo1IoBrokerLabel.Caption := '✓';
+    end;
     sumInfo2IoBrokerLabel.Caption := Format(CustomMessage('IoBrokerInstalled'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, appInstPath]);
+
+    if (iobVersionNewMajor = 0) then begin
+      sumInfo2IoBrokerNewestLabel.Caption := CustomMessage('IoBrokerNewestNotFound');
+    end
+    else begin
+      if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionMajor, iobVersionMinor, iobVersionPatch) > 0) then begin
+        sumInfo2IoBrokerNewestLabel.Caption := Format(CustomMessage('IoBrokerNewestNewer'), [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+      end
+      else begin
+        if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionMajor, iobVersionMinor, iobVersionPatch) = 0) then begin
+          sumInfo2IoBrokerNewestLabel.Caption := CustomMessage('IoBrokerNewestOK');
+        end
+        else begin
+          sumInfo2IoBrokerNewestLabel.Caption := Format(CustomMessage('IoBrokerNewest'), [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+        end;
+      end;
+    end;
   end;
 
   if iobRunning then begin
@@ -1559,7 +1679,7 @@ begin
     sumInfo1PortAdminLabelB.Caption := '';
     sumInfo2PortAdminLabelB.Caption := '';
 
-    progressPage.SetProgress(progress, maxProgress); progress := progress +3;
+    progressPage.SetProgress(progress, maxProgress); progress := progress + 1;
     updateSummaryPagePortsA(iobStatesPort, iobObjectsPort, iobAdminPort, portsInUse, maxProgress, progress);
   end;
 
@@ -1663,22 +1783,33 @@ begin
     optFixIoBrokerCB.Enabled := False;
   end
   else begin
-    optInstallIoBrokerCB.checked := False;
-    optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBrokeralreadyInstalled'),[appInstPath]);
-    optInstallIoBrokerCB.Enabled := False;
+    if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionMajor, iobVersionMinor, iobVersionPatch) > 0) then begin
+      optInstallIoBrokerCB.checked := True;
+      optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBrokerUpdate'),[iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+      optInstallIoBrokerCB.Enabled := True;
 
-    optFixIoBrokerCB.checked := True;
-    optFixIoBrokerCB.Caption := ' ' + Format(CustomMessage('FixIoBroker'),[appInstPath]);
-    optFixIoBrokerCB.Enabled := True;
+      optFixIoBrokerCB.checked := False;
+      optFixIoBrokerCB.Caption := ' ' + Format(CustomMessage('FixIoBroker'),[appInstPath]);
+      optFixIoBrokerCB.Enabled := False;
+    end
+    else begin
+      optInstallIoBrokerCB.checked := False;
+      optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBrokeralreadyInstalled'),[appInstPath]);
+      optInstallIoBrokerCB.Enabled := False;
+
+      optFixIoBrokerCB.checked := True;
+      optFixIoBrokerCB.Caption := ' ' + Format(CustomMessage('FixIoBroker'),[appInstPath]);
+      optFixIoBrokerCB.Enabled := True;
+    end;
   end;
 
-  optAddFirewallRuleCB.Checked := optInstallIoBrokerCB.checked or firewallRuleSet;
+  optAddFirewallRuleCB.Checked := (optInstallIoBrokerCB.checked and not isIobUpdate) or firewallRuleSet;
   optAddFirewallRuleCB.Caption := ' ' + CustomMessage('AdaptFirewallRule');
 
   optServiceAutoStartCB.Checked := isIobServiceAutoStartReg(iobServiceName);
   optServiceAutoStartCB.Caption := ' ' + CustomMessage('ServiceAutostart');
 
-  if optInstallIoBrokerCB.Checked then begin
+  if optInstallIoBrokerCB.Checked and not isIobUpdate then begin
     optDataMigrationCB.Visible := True;
     optDataMigrationButton.Visible := True;
     optDataMigrationButton.Enabled := False;
@@ -1698,13 +1829,19 @@ begin
      (optDataMigrationCB <> nil) and
      (optServiceAutoStartCB <> nil)
   then begin
+    if optInstallIoBrokerCB.Checked then begin
+      optFixIoBrokerCB.Checked := False;
+      optFixIoBrokerCB.Enabled := False;
+    end
+    else begin
+      optFixIoBrokerCB.Enabled := True;
+    end;
     if optInstallNodeCB.Checked or
        optInstallIoBrokerCB.Checked or
        optFixIoBrokerCB.Checked or
        optDataMigrationCB.Checked or
        (optServiceAutoStartCB.Checked <> isIobServiceAutoStartReg(iobServiceName)) or
        (optAddFirewallRuleCB.Checked <> firewallRuleSet)
-
     then begin
       if optDataMigrationCB.Checked and (optDataMigrationLabel.Caption = '') then begin
         WizardForm.NextButton.Enabled := False;
@@ -1763,6 +1900,7 @@ end;
 procedure createPages;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
+
   if summaryPage = nil then begin
     if isFirstInstallerRun then begin
       expertOptionsPage := CreateCustomPage(wpSelectDir, CustomMessage('ExpertMode'), CustomMessage('ExpertOptionsCaption'));
@@ -1808,7 +1946,7 @@ begin
     with sumInfo1IoBrokerLabel do begin
       Parent := summaryPage.Surface;
       Left := ScaleX(8);
-      Top := sumInfo3NodeLabel.Top + sumInfo1NodeLabel.Height + ScaleY(12);
+      Top := sumInfo3NodeLabel.Top + sumInfo1NodeLabel.Height + ScaleY(8);
       Width := ScaleX(12);
       Height := ScaleY(12);
       Font.Style := [fsBold];
@@ -1818,7 +1956,16 @@ begin
     with sumInfo2IoBrokerLabel do begin
       Parent := summaryPage.Surface;
       Left := ScaleX(22);
-      Top := sumInfo3NodeLabel.Top + sumInfo1NodeLabel.Height + ScaleY(12);
+      Top := sumInfo3NodeLabel.Top + sumInfo1NodeLabel.Height + ScaleY(8);
+      Width := summaryPage.SurfaceWidth - ScaleX(22);
+      Height := ScaleY(12);
+    end;
+
+    sumInfo2IoBrokerNewestLabel := TLabel.Create(WizardForm);
+    with sumInfo2IoBrokerNewestLabel do begin
+      Parent := summaryPage.Surface;
+      Left := ScaleX(22);
+      Top := sumInfo2IoBrokerLabel.Top + sumInfo2IoBrokerLabel.Height + ScaleY(4);
       Width := summaryPage.SurfaceWidth - ScaleX(22);
       Height := ScaleY(12);
     end;
@@ -1827,7 +1974,7 @@ begin
     with sumInfo1IoBrokerRunLabel do begin
       Parent := summaryPage.Surface;
       Left := ScaleX(8);
-      Top := sumInfo1IoBrokerLabel.Top + sumInfo1IoBrokerLabel.Height + ScaleY(4);
+      Top := sumInfo2IoBrokerNewestLabel.Top + sumInfo2IoBrokerNewestLabel.Height + ScaleY(8);
       Width := ScaleX(12);
       Height := ScaleY(12);
       Font.Style := [fsBold];
@@ -1837,7 +1984,7 @@ begin
     with sumInfo2IoBrokerRunLabel do begin
       Parent := summaryPage.Surface;
       Left := ScaleX(22);
-      Top := sumInfo1IoBrokerLabel.Top + sumInfo1IoBrokerLabel.Height + ScaleY(4);
+      Top := sumInfo2IoBrokerNewestLabel.Top + sumInfo2IoBrokerNewestLabel.Height + ScaleY(8);
       Width := summaryPage.SurfaceWidth - ScaleX(22);
       Height := ScaleY(12);
     end;
@@ -1846,7 +1993,7 @@ begin
     with sumInfo1PortStatesLabelA do begin
       Parent := summaryPage.Surface;
       Left := ScaleX(8);
-      Top := sumInfo2IoBrokerRunLabel.Top + sumInfo2IoBrokerRunLabel.Height + ScaleY(12);
+      Top := sumInfo2IoBrokerRunLabel.Top + sumInfo2IoBrokerRunLabel.Height + ScaleY(8);
       Width := ScaleX(12);
       Height := ScaleY(12);
       Font.Style := [fsBold];
@@ -1856,7 +2003,7 @@ begin
     with sumInfo2PortStatesLabelA do begin
       Parent := summaryPage.Surface;
       Left := ScaleX(22);
-      Top := sumInfo2IoBrokerRunLabel.Top + sumInfo2IoBrokerRunLabel.Height + ScaleY(12);
+      Top := sumInfo2IoBrokerRunLabel.Top + sumInfo2IoBrokerRunLabel.Height + ScaleY(8);
       Width := summaryPage.SurfaceWidth - ScaleX(22);
       Height := ScaleY(12);
     end;
@@ -1959,7 +2106,7 @@ begin
     sumSummaryLabel := TLabel.Create(WizardForm);
     with sumSummaryLabel do begin
       Parent := summaryPage.Surface;
-      Top := sumInfo1PortAdminLabelB.Top + sumInfo1PortAdminLabelB.Height + ScaleY(10);
+      Top := sumInfo1PortAdminLabelB.Top + sumInfo1PortAdminLabelB.Height + ScaleY(8);
       Width := summaryPage.SurfaceWidth - ScaleX(4);
       Height := ScaleY(75);
       AutoSize := False;
@@ -2372,6 +2519,9 @@ var
   LogName: String;
   info: String;
   output: String;
+  majorV: Integer;
+  minorV: Integer;
+  patchV: Integer;
 begin
   result := False;
   cmd := '';
@@ -2387,16 +2537,23 @@ begin
   end;
 
   if optInstallIoBrokerCB.Checked then begin
-    if iobServiceExists then begin
+    if iobServiceExists and not isIobUpdate then begin
       // Service exists, but ioBroker not installed. We remove the Service
       stopIobService(iobServiceName, '');
       output := execAndReturnOutput('sc delete ' + iobServiceName + '.exe', False, '', '');
       Log('Delete Service: ' + output);
     end;
     gatherInstNodeData;
-    cmd := '"' + nodePath + '\npx" --yes @iobroker/install@latest';
-    LogName := getLogNameIoBrokerInstall;
-    info := CustomMessage('InstallingIoBroker');
+    if isIobUpdate then begin
+      cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" upgrade self';
+      LogName := getLogNameIoBrokerUpdate;
+      info := Format(CustomMessage('UpdatingIoBroker'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+    end
+    else begin
+      cmd := '"' + nodePath + '\npx" --yes @iobroker/install@latest';
+      LogName := getLogNameIoBrokerInstall;
+      info := CustomMessage('InstallingIoBroker');
+    end;
   end
   else begin
     if optFixIoBrokerCB.Checked then begin
@@ -2419,20 +2576,26 @@ begin
       // Don't panic, fix will restore it anyway, and install will install it anyway
       DeleteFile(appInstPath + '\iobroker.bat');
       if execAndStoreOutput(cmd , LogName, nodePath, appInstPath) then begin
-
-        if (FileExists(appInstPath + '\instDone')) then begin
-          if expertCB.Checked and exoNewServerRB.Checked and optInstallIoBrokerCB.Checked or optDataMigrationCB.Checked then begin
-            Result := reconfigureIoBroker(info, LogName);
-            if not Result then begin
-              MsgBox(CustomMessage('ReconfigureError'), mbError, MB_OK or MB_SETFOREGROUND);
-              Exit;
-            end;
-          end;
-          Log('ioBroker installation/fixing completed!');
-          Result := checkIoBrokerRunning(info);
+        if isIobUpdate then begin
+          // In this case no instDone file is created, we have to verify the success in another way:
+          gatherNewestIoBrokerVersion(majorV, minorV, patchV);
+          Result := compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, majorV, minorV, patchV) = 0;
         end
         else begin
-          Log('ioBroker installation/fixing did not run til the end!');
+          if (FileExists(appInstPath + '\instDone')) then begin
+            if expertCB.Checked and exoNewServerRB.Checked and optInstallIoBrokerCB.Checked or optDataMigrationCB.Checked then begin
+              Result := reconfigureIoBroker(info, LogName);
+              if not Result then begin
+                MsgBox(CustomMessage('ReconfigureError'), mbError, MB_OK or MB_SETFOREGROUND);
+                Exit;
+              end;
+            end;
+            Log('ioBroker installation/fixing completed!');
+            Result := checkIoBrokerRunning(info);
+          end
+          else begin
+            Log('ioBroker installation/fixing did not run til the end!');
+          end;
         end;
       end
       else begin
@@ -2820,7 +2983,7 @@ begin
       WizardForm.ReadyLabel.Caption := CustomMessage('ReadyUninstall');
     end
     else begin
-      if not optInstallIoBrokerCB.checked then begin
+      if not optInstallIoBrokerCB.checked or isIobUpdate then begin
         WizardForm.NextButton.Caption := CustomMessage('Update');
         WizardForm.PageNameLabel.Caption := CustomMessage('ReadyMaintainTitle');;
         WizardForm.PageDescriptionLabel.Caption := CustomMessage('ReadyMaintainSubTitle');
@@ -2924,9 +3087,11 @@ begin
       // Remove old log files and old semaphore file
       DeleteFile(getLogNameNodeJsInstall + '_old');
       DeleteFile(getLogNameIoBrokerInstall + '_old');
+      DeleteFile(getLogNameIoBrokerUpdate + '_old');
       DeleteFile(getLogNameIoBrokerFix + '_old');
       RenameFile(getLogNameNodeJsInstall, getLogNameNodeJsInstall + '_old');
       RenameFile(getLogNameIoBrokerInstall, getLogNameIoBrokerInstall + '_old');
+      RenameFile(getLogNameIoBrokerUpdate, getLogNameIoBrokerUpdate + '_old');
       RenameFile(getLogNameIoBrokerFix, getLogNameIoBrokerFix + '_old');
       DeleteFile(appInstPath + '\instDone');
 
@@ -2952,8 +3117,14 @@ begin
       if cont then begin
         if installIoBroker = False then begin
           if optInstallIoBrokerCB.Checked then begin
-            MsgBox(CustomMessage('InstallationFailedIoBroker'), mbError, MB_OK or MB_SETFOREGROUND);
-            Exec('notepad', getLogNameIoBrokerInstall, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+            if isIobUpdate then begin
+              MsgBox(CustomMessage('UpdatingFailedIoBroker'), mbError, MB_OK or MB_SETFOREGROUND);
+              Exec('notepad', getLogNameIoBrokerUpdate, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+            end
+            else begin
+              MsgBox(CustomMessage('InstallationFailedIoBroker'), mbError, MB_OK or MB_SETFOREGROUND);
+              Exec('notepad', getLogNameIoBrokerInstall, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+            end;
           end
           else begin
             MsgBox(CustomMessage('InstallationFailedIoBrokerFix'), mbError, MB_OK or MB_SETFOREGROUND);
@@ -3065,8 +3236,13 @@ begin
     Result := Result + NewLine + NewLine + 'ioBroker:';
 
     if optInstallIoBrokerCB.checked then begin
-      Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallIoBroker'), [appInstPath]);
-      Result := Result + NewLine + Space + Format(CustomMessage('SummaryIoBrokerServiceCreateDyn'), [iobServiceName]);
+      if isIobUpdate then begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallIoBrokerUpdate'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+      end
+      else begin
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallIoBroker'), [appInstPath]);
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryIoBrokerServiceCreateDyn'), [iobServiceName]);
+      end;
     end
     else begin
       if iobversionMajor > 0 then begin
@@ -3102,7 +3278,7 @@ begin
 
     Result := Result + NewLine + Space + CustomMessage('SummaryStartioBroker') + ' ' + Format(CustomMessage('Service'), [iobServiceName]);
 
-    if expertCB.Checked and exoNewServerRB.Checked and optInstallIoBrokerCB.Checked or optDataMigrationCB.Checked then begin
+    if expertCB.Checked and exoNewServerRB.Checked and optInstallIoBrokerCB.Checked and not isIobUpdate or optDataMigrationCB.Checked then begin
       Result := Result + NewLine + Space + CustomMessage('SummaryShutdownBroker') + ' ' + Format(CustomMessage('Service'), [iobServiceName]);
       if optDataMigrationCB.Checked then begin
         Result := Result + NewLine + Space + Format(CustomMessage('CopyMigrationDataFrom'), [optDataMigrationLabel.Caption]);
