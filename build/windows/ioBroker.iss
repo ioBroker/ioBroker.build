@@ -844,6 +844,24 @@ begin
   Result := appInstPath + '\log\installIoBrokerFix.log';
 end;
 
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function getLogNameIoBroker: String;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+begin
+  Result := getLogNameIoBrokerUpdate;
+  if optInstallIoBrokerCB.Checked then begin
+    if not isIobUpdate then begin
+      Result := getLogNameIoBrokerInstall;
+    end;
+  end
+  else begin
+    if optFixIoBrokerCB.Checked then begin
+      Result := getLogNameIoBrokerFix
+    end
+  end;
+  Log('Log file: ' + Result);
+end;
+
 {++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  Callbacks for downloads
  ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++}
@@ -933,8 +951,6 @@ begin
   end;
 end;
 
-
-
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 function getPortInfo(port: Integer): String;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -944,7 +960,7 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function checkIoBrokerRunning(info: String): Boolean;
+function checkIoBrokerRunning(info: String; logName: String): Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   iobServiceOK: Boolean;
@@ -953,19 +969,23 @@ var
 begin
   Result := False;
   marqueePage.SetText(info, CustomMessage('WaitForService'));
+  SaveStringToFile(logName, 'Waiting for ioBroker service ...' + chr(13) + chr(10), True);
   for i := 0 to 15 do begin
     Sleep(1000);
     iobServiceOK := isIobServiceRunning(iobServiceName);
     if iobServiceOK then break;
   end;
   if iobServiceOK then begin
+    Log('ioBroker service started!');
+    SaveStringToFile(logName, 'ioBroker service ' + iobServiceName + ' started! ---> OK' + chr(13) + chr(10), True);
+
     // If Node.js was not installed at the beginning, the Admin port is probably 0.
     // In this case we try to fetch it again:
+    SaveStringToFile(logName, 'Waiting for ioBroker Admin ...' + chr(13) + chr(10), True);
     if iobAdminPort = 0 then begin
       if nodepath = '' then gatherInstNodeData;
       iobAdminPort := getIobAdminPort(appInstPath);
     end;
-    Log('ioBroker service was started!');
     marqueePage.SetText(info, CustomMessage('WaitForAdmin'));
     for i := 0 to 100 do begin
     Sleep(500);
@@ -974,14 +994,17 @@ begin
     end;
     if portInfo <> '' then begin
       Log('ioBroker Admin is reachable!');
+      SaveStringToFile(logName, Format('ioBroker Admin is reachable on port %d! ---> OK', [iobAdminPort]) + chr(13) + chr(10), True);
       Result := True;
     end
     else begin
-      Log('ioBroker Admin is not reachable!');
+      Log('ioBroker Admin is not reachable (timeout)!');
+      SaveStringToFile(logName, 'ioBroker Admin is not reachable (timeout)!' + chr(13) + chr(10), True);
     end
   end
   else begin
-    Log('ioBroker service was not started!');
+    Log('ioBroker service not started (timeout)!');
+    SaveStringToFile(logName, 'ioBroker service ' + iobServiceName + ' not started (timeout)!' + chr(13) + chr(10), True);
   end;
 end;
 
@@ -1026,7 +1049,7 @@ begin
     ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
     versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" update | find "Controller ""js-controller"":"', True, nodePath, '');
     if (versionString <> '') then begin
-      curPos := 29; // |Controller "js-controller": |
+      curPos := pos('Controller "js-controller": ', versionString) + 28;
       versionString := Trim(Copy(versionString, curPos, Length(versionString) - curPos));
       curPos := pos(' ', versionString);
       if (curPos > 0) then begin
@@ -2516,7 +2539,7 @@ function installIoBroker: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   cmd: String;
-  LogName: String;
+  logName: String;
   info: String;
   output: String;
   majorV: Integer;
@@ -2525,7 +2548,7 @@ var
 begin
   result := False;
   cmd := '';
-  LogName := ''
+  logName := ''
   info := '';
 
   if expertCB.Checked and exoNewServerRB.Checked then begin
@@ -2535,6 +2558,8 @@ begin
       Exit;
     end;
   end;
+
+  logName := getLogNameIoBroker;
 
   if optInstallIoBrokerCB.Checked then begin
     if iobServiceExists and not isIobUpdate then begin
@@ -2546,12 +2571,10 @@ begin
     gatherInstNodeData;
     if isIobUpdate then begin
       cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" upgrade self';
-      LogName := getLogNameIoBrokerUpdate;
       info := Format(CustomMessage('UpdatingIoBroker'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
     end
     else begin
       cmd := '"' + nodePath + '\npx" --yes @iobroker/install@latest';
-      LogName := getLogNameIoBrokerInstall;
       info := CustomMessage('InstallingIoBroker');
     end;
   end
@@ -2559,7 +2582,6 @@ begin
     if optFixIoBrokerCB.Checked then begin
       gatherInstNodeData;
       cmd := '"' + nodePath + '\npx" --yes @iobroker/fix@latest';
-      LogName := getLogNameIoBrokerFix
       info := CustomMessage('FixingIoBroker');
     end
   end;
@@ -2570,36 +2592,54 @@ begin
       marqueePage.Show
       marqueePage.Animate
 
-      fixPrefixPath(LogName);
+      fixPrefixPath(logName);
 
       // ioBroker.bat makes trouble when calling npx@iobroker..., delete it
       // Don't panic, fix will restore it anyway, and install will install it anyway
       DeleteFile(appInstPath + '\iobroker.bat');
-      if execAndStoreOutput(cmd , LogName, nodePath, appInstPath) then begin
+      if execAndStoreOutput(cmd , logName, nodePath, appInstPath) then begin
         if isIobUpdate then begin
           // In this case no instDone file is created, we have to verify the success in another way:
           gatherNewestIoBrokerVersion(majorV, minorV, patchV);
           Result := compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, majorV, minorV, patchV) = 0;
+          Log('ioBroker JS-Controller update done!');
+          SaveStringToFile(logName,
+                          '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                          'JS-Controller Update done.' + chr(13) + chr(10) +
+                          Format('Verification: Latest JS-Controller: %d.%d.%d, installed: %d.%d.%d', [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, majorV, minorV, patchV]) + chr(13) + chr(10) +
+                          '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
         end
         else begin
           if (FileExists(appInstPath + '\instDone')) then begin
             if expertCB.Checked and exoNewServerRB.Checked and optInstallIoBrokerCB.Checked or optDataMigrationCB.Checked then begin
-              Result := reconfigureIoBroker(info, LogName);
+              Result := reconfigureIoBroker(info, logName);
               if not Result then begin
                 MsgBox(CustomMessage('ReconfigureError'), mbError, MB_OK or MB_SETFOREGROUND);
                 Exit;
               end;
             end;
             Log('ioBroker installation/fixing completed!');
-            Result := checkIoBrokerRunning(info);
+            SaveStringToFile(logName,
+                            '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                            'ioBroker installation/fixing completed!' + chr(13) + chr(10) +
+                            '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
+              Result := checkIoBrokerRunning(info, logName);
           end
           else begin
             Log('ioBroker installation/fixing did not run til the end!');
+            SaveStringToFile(logName,
+                            '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                            'ioBroker installation/fixing was not completed properly!' + chr(13) + chr(10) +
+                            '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
           end;
         end;
       end
       else begin
         Log('ioBroker installation/fixing was not executed due to unknown error!');
+        SaveStringToFile(logName,
+                        '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                        'ioBroker installation/fixing: Unknown error occurred!' + chr(13) + chr(10) +
+                        '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
       end;
 
     except
@@ -3014,6 +3054,7 @@ var
   output: String;
   cont: Boolean;
   resultCode: Integer;
+  logName: String;
 begin
   if CurStep = ssInstall then begin
     if expertCB.Checked and exoUninstallServerRB.Checked then begin
@@ -3078,6 +3119,7 @@ begin
       end;
     end
     else begin
+      logName := getLogNameIoBroker;
       if optDataMigrationCB.Checked then begin
         MsgBox(CustomMessage('MigrationHints'), mbInformation, MB_OK or MB_SETFOREGROUND);
       end;
@@ -3119,16 +3161,16 @@ begin
           if optInstallIoBrokerCB.Checked then begin
             if isIobUpdate then begin
               MsgBox(CustomMessage('UpdatingFailedIoBroker'), mbError, MB_OK or MB_SETFOREGROUND);
-              Exec('notepad', getLogNameIoBrokerUpdate, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+              Exec('notepad', logName, '', SW_SHOWNORMAL, ewNoWait, resultCode);
             end
             else begin
               MsgBox(CustomMessage('InstallationFailedIoBroker'), mbError, MB_OK or MB_SETFOREGROUND);
-              Exec('notepad', getLogNameIoBrokerInstall, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+              Exec('notepad', logName, '', SW_SHOWNORMAL, ewNoWait, resultCode);
             end;
           end
           else begin
             MsgBox(CustomMessage('InstallationFailedIoBrokerFix'), mbError, MB_OK or MB_SETFOREGROUND);
-            Exec('notepad', getLogNameIoBrokerFix, '', SW_SHOWNORMAL, ewNoWait, resultCode);
+            Exec('notepad', logName, '', SW_SHOWNORMAL, ewNoWait, resultCode);
           end;
           cont := False;
         end;
@@ -3163,9 +3205,11 @@ begin
 
             // In this case ioBroker was not started automatically, restart ioBroker
             // After installation and fix the service is started anyway
+            SaveStringToFile(logName, 'Starting ioBroker service ...' + chr(13) + chr(10), True);
             output := execAndReturnOutput('sc start ' + iobServiceName + '.exe', False, '', '');
+            SaveStringToFile(logName, 'Result: ' + output + chr(13) + chr(10), True);
             Log('Start ioBroker service:' + output);
-            cont := checkIoBrokerRunning(CustomMessage('StartIoBroker'));
+            cont := checkIoBrokerRunning(CustomMessage('StartIoBroker'), logName);
           except
             cont := False;
           finally
