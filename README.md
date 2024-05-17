@@ -35,11 +35,11 @@ Pre-requires:
 
 ## Changelog
 
-### **WORK IN PROGRESS**
+# 3.1.0 (17.05.2024)
 
 (Gaspode) Logging enhanced
 (Gaspode) Fixed: Checking Admin port after installation fails if Node.js was not installed when the installation started
-(Gaspode) Update/Upgrade of JS-Controller implemented -
+(Gaspode) Update/Upgrade of JS-Controller implemented
 
 # 3.0.1 (25.02.2024)
 
