@@ -33,6 +33,7 @@
 ; - 07.05.2024 Gaspode: Fixed: Checking Admin port after installation fails if Node.js was not -
 ;                       installed when the installation started                                -
 ; - 07.05.2024 Gaspode: Update/Upgrade of JS-Controller implemented                            -
+; - 19.05.2024 Gaspode: Fixed: Set Admin port in expert mode failed in rare cases              -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -906,6 +907,25 @@ begin
   statusString := execAndReturnOutput('sc query ' + serviceName + '.exe', True, '', '');
   Log(Format('ioBroker Service Status: %s', [statusString]));
   Result := pos('RUNNING', statusString) > 0;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function isIobServiceStopped(serviceName: String): boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+var
+  statusString: String;
+  retryCount: Integer;
+begin
+  Result := False;
+  retryCount := 0;
+  while (not Result and (retryCount < 20)) do begin
+    Log(Format('Check if ioBroker Service Status: %s is stopped (try: %d).', [serviceName, retryCount+1]));
+    statusString := execAndReturnOutput('sc query ' + serviceName + '.exe', True, '', '');
+    Log(Format('ioBroker Service Status: %s', [statusString]));
+    Result := pos('STOPPED', statusString) > 0;
+    Sleep(1000);
+    retryCount := retryCount + 1;
+  end;
 end;
 
 
@@ -2674,10 +2694,26 @@ begin
                        'Stop service ' + serviceName + '.exe:' + chr(13) + chr(10) +
                        output + chr(13) + chr(10), True);
     end;
+
     Sleep(2000);
-    if not isIobServiceRunning(serviceName) then begin
+
+    if isIobServiceStopped(serviceName) then begin
+      saveStringToFile(logFileName,'Service stopped!' + chr(13) + chr(10), True);
       Result := True;
       Exit;
+    end
+    else begin
+      saveStringToFile(logFileName,'Service not stopped! Try again.' + chr(13) + chr(10), True);
+      output := execAndReturnOutput('sc stop ' + serviceName + '.exe', True, '', '');
+      Sleep(5000);
+      if isIobServiceStopped(serviceName) then begin
+        saveStringToFile(logFileName,'Service stopped! + chr(13) + chr(10)', True);
+        Result := True;
+        Exit;
+      end
+      else begin
+        saveStringToFile(logFileName,'Service not stopped! Try to kill processes.' + chr(13) + chr(10), True);
+      end;
     end;
   end;
 
@@ -3881,7 +3917,9 @@ function reconfigureIoBrokerAdminPort(adminPort: Integer; logFileName: String): 
 var
   cmd: String;
   resultStr: String;
+  newAdminPort: Integer;
 begin
+  Sleep(2000);
   Result := True;
   cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" set admin.0 --port ' + Format('%d', [adminPort]);
   Log (cmd);
@@ -3892,6 +3930,13 @@ begin
                    '----------------------------------------------' + chr(13) + chr(10) +
                    'reconfigureIoBrokerAdminPort:' + chr(13) + chr(10) +
                    resultStr + chr(13) + chr(10), True);
+
+  Sleep(2000);
+  newAdminPort := getIobAdminPort(appInstPath);
+  Log(Format('New Admin Port = %d', [newAdminPort]));
+  SaveStringToFile(logFileName,
+                   Format('New Admin Port = %d', [newAdminPort]) + chr(13) + chr(10), True);
+
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
