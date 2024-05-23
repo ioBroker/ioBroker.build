@@ -35,6 +35,10 @@ Pre-requires:
 
 ## Changelog
 
+# 3.2.0 (23.05.2024)
+
+- (Gaspode) Execute fixer after JS-Controller Upgrade (required for JS-Controller 6)
+
 # 3.1.0 (17.05.2024)
 
 - (Gaspode) Update/Upgrade of JS-Controller implemented
