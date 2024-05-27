@@ -34,6 +34,8 @@
 ;                       installed when the installation started                                -
 ; - 07.05.2024 Gaspode: Update/Upgrade of JS-Controller implemented                            -
 ; - 19.05.2024 Gaspode: Fixed: Set Admin port in expert mode failed in rare cases              -
+; - 23.05.2024 Gaspode: Execute fixer after JS-Controller Upgrade                              -
+; -                     (required for JS-Controller 6)                                         -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -894,8 +896,7 @@ end;
 function ioBrokerNeedsStart: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
-  Result := (optInstallIoBrokerCB.Checked = False) and (optFixIoBrokerCB.Checked = False) or
-            isIobUpdate;
+  Result := (optInstallIoBrokerCB.Checked = False) and (optFixIoBrokerCB.Checked = False);
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -1873,7 +1874,12 @@ begin
      (optServiceAutoStartCB <> nil)
   then begin
     if optInstallIoBrokerCB.Checked then begin
-      optFixIoBrokerCB.Checked := False;
+      if isIobUpdate then begin
+        optFixIoBrokerCB.Checked := True;
+      end
+      else begin
+        optFixIoBrokerCB.Checked := False;
+      end;
       optFixIoBrokerCB.Enabled := False;
     end
     else begin
@@ -2628,6 +2634,37 @@ begin
                           'JS-Controller Update done.' + chr(13) + chr(10) +
                           Format('Verification: Latest JS-Controller: %d.%d.%d, installed: %d.%d.%d', [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, majorV, minorV, patchV]) + chr(13) + chr(10) +
                           '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
+
+          if Result then begin
+            // After updateing the JS-Controller we MUST execute the fixer
+            marqueePage.SetText(CustomMessage('FixingIoBroker'), '');
+            if execAndStoreOutput('"' + nodePath + '\npx" --yes @iobroker/fix@latest' , logName, nodePath, appInstPath) then begin
+              if (FileExists(appInstPath + '\instDone')) then begin
+                Log('ioBroker fixing completed!');
+                SaveStringToFile(logName,
+                                '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                                'ioBroker fixing completed!' + chr(13) + chr(10) +
+                                '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
+                Result := checkIoBrokerRunning(info, logName);
+              end
+              else begin
+                Result := False;
+                Log('ioBroker fixing did not run til the end!');
+                SaveStringToFile(logName,
+                                '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                                'ioBroker fixing was not completed properly!' + chr(13) + chr(10) +
+                                '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
+              end;
+            end
+            else begin
+              Result := False;
+              Log('ioBroker fixing was not executed due to unknown error!');
+              SaveStringToFile(logName,
+                              '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                              'ioBroker fixing: Unknown error occurred!' + chr(13) + chr(10) +
+                              '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
+            end;
+          end;
         end
         else begin
           if (FileExists(appInstPath + '\instDone')) then begin
