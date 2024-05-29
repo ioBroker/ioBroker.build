@@ -36,6 +36,8 @@
 ; - 19.05.2024 Gaspode: Fixed: Set Admin port in expert mode failed in rare cases              -
 ; - 23.05.2024 Gaspode: Execute fixer after JS-Controller Upgrade                              -
 ; -                     (required for JS-Controller 6)                                         -
+; - 29.05.2024 Gaspode: Make fixer after JS-Controller Upgrade optional                        -
+; - 29.05.2024 Gaspode: Offer Alpha and Beta updates of JS-Controller in expert mode (@next)   -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -210,6 +212,7 @@ var
   exoIntroLabel: TLabel;
   exoNewServerRB: TRadioButton;
   exoMaintainServerRB: TRadioButton;
+  exoMaintainServerAlphaBetaCB: TCheckBox;
   exoUninstallServerRB: TRadioButton;
   exoNewServerLabel: TLabel;
   exoMaintainServerCombo: TComboBox;
@@ -267,10 +270,12 @@ var
   iobVersionMajor: Integer;  // Major Version of the currently handled iob server installation
   iobVersionMinor: Integer;  // Minor Version of the currently handled iob server installation
   iobVersionPatch: Integer;  // Patch Version of the currently handled iob server installation
+  iobVersionPostfix: String; // Version postfix of the handled iob server if it is an alpha or beta version
 
   iobVersionNewMajor: Integer;  // Major Version of the currently available iob server version
   iobVersionNewMinor: Integer;  // Minor Version of the currently available iob server version
   iobVersionNewPatch: Integer;  // Patch Version of the currently available iob server version
+  iobVersionNewPostfix: String; // Version postfix of the currently available iob server version if it is an alpha or beta version
 
   iobServiceExists: Boolean;     // True if a windows service with service name 'iobServiceName' already exists
   iobInstalled: Boolean;         // True if an ioBroker installation was found and verified in the currently handled path
@@ -587,12 +592,29 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function convertVersion(s: String; var major: Integer; var minor: Integer; var patch: Integer): Boolean;
+function convertVersion(s: String; var major: Integer; var minor: Integer; var patch: Integer; var postfix: String): Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
+  curPos: Integer;
   versionArray: TArrayOfString;
 begin
   Result := False;
+
+  major := 0;
+  minor := 0;
+  patch := 0;
+  postfix := '';
+
+  // We search fo the first character which is not numerical and no dot to find out the three part version string
+  for curPos := 1 to Length(s) do begin
+    if not (s[curPos] in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.']) then begin
+      postfix := copy(s, curPos, length(s));
+      s := copy(s,1,curPos - 1)
+      Break;
+    end;
+  end;
+
+  // At this point versionString contains the standard three part version string
   explode(versionArray, s, '.');
   if (GetArrayLength(versionArray) > 2) then begin
     major := StrToIntDef(versionArray[0], 0);
@@ -896,7 +918,7 @@ end;
 function ioBrokerNeedsStart: Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
-  Result := (optInstallIoBrokerCB.Checked = False) and (optFixIoBrokerCB.Checked = False);
+  Result := (optInstallIoBrokerCB.Checked = False) and (optFixIoBrokerCB.Checked = False) or isIobUpdate;
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
@@ -1054,7 +1076,7 @@ end;
 
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-procedure gatherNewestIoBrokerVersion(var major: Integer; var minor: Integer; var patch: Integer);
+procedure gatherNewestIoBrokerVersion(var major: Integer; var minor: Integer; var patch: Integer; var postfix: String);
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   versionString: String;
@@ -1065,23 +1087,36 @@ begin
   major := 0;
   minor := 0;
   patch := 0;
+  postfix := '';
   if (nodePath <> '') then begin
-    nodeJsEx := nodePath + '\node.exe';
-    ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
-    versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" update | find "Controller ""js-controller"":"', True, nodePath, '');
-    if (versionString <> '') then begin
-      curPos := pos('Controller "js-controller": ', versionString) + 28;
-      versionString := Trim(Copy(versionString, curPos, Length(versionString) - curPos));
-      curPos := pos(' ', versionString);
-      if (curPos > 0) then begin
-        versionString := Trim(Copy(versionString, 1, curPos-1));
-        Log(Format('Latest ioBroker version: %s', [versionString]));
-        convertVersion(versionString, major, minor, patch);
-        Log(Format('Latest ioBroker version: %d, %d, %d', [major, minor, patch]));
+    if not exoMaintainServerAlphaBetaCB.Checked then begin
+      nodeJsEx := nodePath + '\node.exe';
+      ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
+      versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" update | find "Controller ""js-controller"":"', True, nodePath, '');
+      if (versionString <> '') then begin
+        curPos := pos('Controller "js-controller": ', versionString) + 28;
+        versionString := Trim(Copy(versionString, curPos, Length(versionString) - curPos));
+        curPos := pos(' ', versionString);
+        if (curPos > 0) then begin
+          versionString := Trim(Copy(versionString, 1, curPos-1));
+          Log(Format('Latest ioBroker version: %s', [versionString]));
+          convertVersion(versionString, major, minor, patch, postfix);
+          Log(Format('Latest ioBroker version: %d, %d, %d', [major, minor, patch]));
+        end;
+      end
+      else begin
+        Log('Latest ioBroker version could not be detected!');
       end;
     end
     else begin
-      Log('Latest ioBroker version could not be detected!');
+      versionString := execAndReturnOutput('"' + nodepath + '\npm" view iobroker.js-controller@next version', True, nodePath, '');
+      if versionString <> '' then begin
+        convertVersion(versionString, major, minor, patch, postfix);
+        Log(Format('Latest ioBroker version: %d, %d, %d, %s', [major, minor, patch, postfix]));
+      end
+      else begin
+        Log('Latest ioBroker version could not be detected!');
+      end;
     end;
   end;
 end;
@@ -1098,10 +1133,12 @@ begin
   iobVersionMajor := 0;
   iobVersionMinor := 0;
   iobVersionPatch := 0;
+  iobVersionPostfix := '';
 
   iobVersionNewMajor := 0;
   iobVersionNewMinor := 0;
   iobVersionNewPatch := 0;
+  iobVersionNewPostfix := ''
 
   ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
   if (FileExists(ioBrokerEx)) then begin
@@ -1109,9 +1146,9 @@ begin
     if (nodePath <> '') then begin
       nodeJsEx := nodePath + '\node.exe';
       versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" --version', False, nodePath, '');
-      if (convertVersion(versionString, iobVersionMajor, iobVersionMinor, iobVersionPatch)) then begin
-        Log(Format('Found ioBroker version: %d, %d, %d', [iobVersionMajor, iobVersionMinor, iobVersionPatch]));
-        gatherNewestIoBrokerVersion(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch);
+      if (convertVersion(versionString, iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix)) then begin
+        Log(Format('Found ioBroker version: %d, %d, %d, %s', [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix]));
+        gatherNewestIoBrokerVersion(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix);
       end;
     end
     else begin
@@ -1264,6 +1301,7 @@ procedure gatherInstNodeData;
 var
   versionString: String;
   found: boolean;
+  dummy: String;
 begin
   found := false;
   instNodeVersionMajor := 0;
@@ -1278,7 +1316,7 @@ begin
         RegQueryStringValue(GetHKLM, 'SOFTWARE\Node.js', 'Version', versionString);
         if (nodePath <> '') then begin
           Log('NodePath: ' + nodePath);
-          if (convertVersion(versionString, instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch)) then begin
+          if (convertVersion(versionString, instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch, dummy)) then begin
             Log(Format('Found Node version: %d, %d, %d', [instNodeVersionMajor, instNodeVersionMinor, instNodeVersionPatch]));
             found := true;
           end;
@@ -1304,6 +1342,7 @@ var
   versionString: String;
   nodeFileName: String;
   errorOccurred: Boolean;
+  dummy: String;
 begin
   errorOccurred := False;
   try
@@ -1366,7 +1405,7 @@ begin
               Log(versionString);
               rcmdNodeDownloadPath := Format( ExpandConstant('{#URL_NODEJS_LATEST_FULL}'),[Round(nodeRecommendedMajorNr), nodeFileName]);
               Log(rcmdNodeDownloadPath);
-              if (convertVersion(versionString, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch)) then begin
+              if (convertVersion(versionString, rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch, dummy)) then begin
                 Log(Format('Recommended Node version: %d, %d, %d', [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]));
               end;
               break;
@@ -1676,21 +1715,21 @@ begin
       sumInfo1IoBrokerLabel.Font.Color := clGreen;
       sumInfo1IoBrokerLabel.Caption := '✓';
     end;
-    sumInfo2IoBrokerLabel.Caption := Format(CustomMessage('IoBrokerInstalled'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, appInstPath]);
+    sumInfo2IoBrokerLabel.Caption := Format(CustomMessage('IoBrokerInstalled'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix, appInstPath]);
 
     if (iobVersionNewMajor = 0) then begin
       sumInfo2IoBrokerNewestLabel.Caption := CustomMessage('IoBrokerNewestNotFound');
     end
     else begin
       if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionMajor, iobVersionMinor, iobVersionPatch) > 0) then begin
-        sumInfo2IoBrokerNewestLabel.Caption := Format(CustomMessage('IoBrokerNewestNewer'), [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+        sumInfo2IoBrokerNewestLabel.Caption := Format(CustomMessage('IoBrokerNewestNewer'), [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
       end
       else begin
         if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionMajor, iobVersionMinor, iobVersionPatch) = 0) then begin
           sumInfo2IoBrokerNewestLabel.Caption := CustomMessage('IoBrokerNewestOK');
         end
         else begin
-          sumInfo2IoBrokerNewestLabel.Caption := Format(CustomMessage('IoBrokerNewest'), [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+          sumInfo2IoBrokerNewestLabel.Caption := Format(CustomMessage('IoBrokerNewest'), [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
         end;
       end;
     end;
@@ -1818,6 +1857,7 @@ begin
   end;
 
   if (iobVersionMajor = 0) and (iobControllerFoundNoNode = False) then begin
+    // ioBroker not installed
     optInstallIoBrokerCB.checked := True;
     optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBroker'),[appInstPath]);
     optInstallIoBrokerCB.Enabled := False;
@@ -1828,20 +1868,23 @@ begin
   end
   else begin
     if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionMajor, iobVersionMinor, iobVersionPatch) > 0) then begin
+      // JS-Controller update available
       optInstallIoBrokerCB.checked := True;
-      optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBrokerUpdate'),[iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+      optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBrokerUpdate'),[iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix,
+                                                                                           iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
       optInstallIoBrokerCB.Enabled := True;
 
       optFixIoBrokerCB.checked := False;
       optFixIoBrokerCB.Caption := ' ' + Format(CustomMessage('FixIoBroker'),[appInstPath]);
-      optFixIoBrokerCB.Enabled := False;
+      optFixIoBrokerCB.Enabled := True;
     end
     else begin
+      // ioBroker already installed and no JS-Controller update available
       optInstallIoBrokerCB.checked := False;
       optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBrokeralreadyInstalled'),[appInstPath]);
       optInstallIoBrokerCB.Enabled := False;
 
-      optFixIoBrokerCB.checked := True;
+      optFixIoBrokerCB.checked := False;
       optFixIoBrokerCB.Caption := ' ' + Format(CustomMessage('FixIoBroker'),[appInstPath]);
       optFixIoBrokerCB.Enabled := True;
     end;
@@ -1873,13 +1916,8 @@ begin
      (optDataMigrationCB <> nil) and
      (optServiceAutoStartCB <> nil)
   then begin
-    if optInstallIoBrokerCB.Checked then begin
-      if isIobUpdate then begin
-        optFixIoBrokerCB.Checked := True;
-      end
-      else begin
-        optFixIoBrokerCB.Checked := False;
-      end;
+    if optInstallIoBrokerCB.Checked and not isIobUpdate then begin
+      optFixIoBrokerCB.Checked := False;
       optFixIoBrokerCB.Enabled := False;
     end
     else begin
@@ -2315,9 +2353,21 @@ begin
     with exoMaintainServerRB do begin
       Parent := expertOptionsPage.Surface;
       Top := exoChangeDirectoryButton.Top + exoChangeDirectoryButton.Height + ScaleY(15);
-      Width := expertOptionsPage.SurfaceWidth - ScaleX(4);
+      Width := (expertOptionsPage.SurfaceWidth - ScaleX(4)) * 2 / 3;
       Height := ScaleX(14);
       Caption := ' ' + CustomMessage('ExpertMaintainServer');
+      OnClick := @expertOptionChanged
+      Enabled := False;
+    end;
+
+    exoMaintainServerAlphaBetaCB := TCheckBox.Create(WizardForm);
+    with exoMaintainServerAlphaBetaCB do begin
+      Parent := expertOptionsPage.Surface;
+      Top := exoChangeDirectoryButton.Top + exoChangeDirectoryButton.Height + ScaleY(15);
+      Left := exoMaintainServerRB.width + ScaleX(2);
+      Width := expertOptionsPage.SurfaceWidth - Left + ScaleX(100);
+      Height := ScaleX(14);
+      Caption := ' ' + CustomMessage('ExpertMaintainServerAlphaBeta');
       OnClick := @expertOptionChanged
       Enabled := False;
     end;
@@ -2571,6 +2621,7 @@ var
   majorV: Integer;
   minorV: Integer;
   patchV: Integer;
+  postfixV: String;
 begin
   result := False;
   cmd := '';
@@ -2596,8 +2647,14 @@ begin
     end;
     gatherInstNodeData;
     if isIobUpdate then begin
-      cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" upgrade self';
-      info := Format(CustomMessage('UpdatingIoBroker'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+      if not exoMaintainServerAlphaBetaCB.Checked then begin
+        cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" upgrade self';
+      end
+      else begin
+        cmd := '"' + nodePath + '\npm" i iobroker.js-controller@next --omit=dev';
+      end;
+      info := Format(CustomMessage('UpdatingIoBroker'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix,
+                                                         iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
     end
     else begin
       cmd := '"' + nodePath + '\npx" --yes @iobroker/install@latest';
@@ -2626,8 +2683,9 @@ begin
       if execAndStoreOutput(cmd , logName, nodePath, appInstPath) then begin
         if isIobUpdate then begin
           // In this case no instDone file is created, we have to verify the success in another way:
-          gatherNewestIoBrokerVersion(majorV, minorV, patchV);
+          gatherNewestIoBrokerVersion(majorV, minorV, patchV, postfixV);
           Result := compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, majorV, minorV, patchV) = 0;
+          // WSC ToDo check including postfix!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
           Log('ioBroker JS-Controller update done!');
           SaveStringToFile(logName,
                           '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
@@ -2635,8 +2693,7 @@ begin
                           Format('Verification: Latest JS-Controller: %d.%d.%d, installed: %d.%d.%d', [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, majorV, minorV, patchV]) + chr(13) + chr(10) +
                           '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
 
-          if Result then begin
-            // After updateing the JS-Controller we MUST execute the fixer
+          if Result and optFixIoBrokerCB.Checked then begin
             marqueePage.SetText(CustomMessage('FixingIoBroker'), '');
             if execAndStoreOutput('"' + nodePath + '\npx" --yes @iobroker/fix@latest' , logName, nodePath, appInstPath) then begin
               if (FileExists(appInstPath + '\instDone')) then begin
@@ -2854,9 +2911,11 @@ var
   onlineMajor: Integer;
   onlineMinor: Integer;
   onlinePatch: Integer;
+  onlinePostfix: String;
   installedMajor: Integer;
   installedMinor: Integer;
   installedPatch: Integer;
+  installedPostfix: String;
 begin
   Result := True;
   updatedInstallerStarted := False;
@@ -2904,8 +2963,8 @@ begin
             Log('Update check: Found Online Installer version: ' + onlineVersionStr);
             Log('Update check: Installed Installer version: ' + installedVersionStr);
 
-            if convertVersion(onlineVersionStr, onlineMajor, onlineMinor, onlinePatch) and
-               convertVersion(installedVersionStr, installedMajor, installedMinor, installedPatch) then begin
+            if convertVersion(onlineVersionStr, onlineMajor, onlineMinor, onlinePatch, onlinePostfix) and
+               convertVersion(installedVersionStr, installedMajor, installedMinor, installedPatch, installedPostfix) then begin
 
               if (onlineMajor > installedMajor) or
                  ((onlineMajor = installedMajor) and (onlineMinor > installedMinor)) or
@@ -3354,7 +3413,8 @@ begin
 
     if optInstallIoBrokerCB.checked then begin
       if isIobUpdate then begin
-        Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallIoBrokerUpdate'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch]);
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallIoBrokerUpdate'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix,
+                                                                                                    iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
       end
       else begin
         Result := Result + NewLine + Space + Format(CustomMessage('SummaryInstallIoBroker'), [appInstPath]);
@@ -4209,14 +4269,19 @@ begin
   if exoNewServerRB.Checked then begin
     exoMaintainServerCombo.Enabled := False;
     exoUninstallServerCombo.Enabled := False;
+    exoMaintainServerAlphaBetaCB.Enabled := False;
+    exoMaintainServerAlphaBetaCB.Checked := False;
   end;
   if exoMaintainServerRB.Checked then begin
     exoMaintainServerCombo.Enabled := True;
     exoUninstallServerCombo.Enabled := False;
+    exoMaintainServerAlphaBetaCB.Enabled := True;
   end;
   if exoUninstallServerRB.Checked then begin
     exoMaintainServerCombo.Enabled := False;
     exoUninstallServerCombo.Enabled := True;
+    exoMaintainServerAlphaBetaCB.Enabled := False;
+    exoMaintainServerAlphaBetaCB.Checked := False;
   end;
 end;
 
