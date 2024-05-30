@@ -155,3 +155,4 @@ dutch.InstallIoBrokerUpdate=Update ioBroker (JS-controller) van versie %d.%d.%d%
 dutch.SummaryInstallIoBrokerUpdate=JS-controller zal worden bijgewerkt van versie %d.%d.%d%s naar %d.%d.%d%s
 dutch.UpdatingIoBroker=JS-controller bijwerken van versie %d.%d.%d%s naar %d.%d.%d%s ...
 dutch.UpdatingFailedIoBroker=ioBroker bijwerken is mislukt. Na het klikken op OK wordt het logbestand weergegeven. Controleer het en zoek de reden voor de mislukking. Het installatieprogramma wordt gesloten.
+dutch.ExpertMaintainServerAlphaBeta=Alpha/Beta (@next)

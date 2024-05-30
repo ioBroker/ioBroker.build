@@ -155,3 +155,4 @@ french.InstallIoBrokerUpdate=Mettre à jour ioBroker (JS-Controller) de la versio
 french.SummaryInstallIoBrokerUpdate=JS-Controller sera mis à jour de la version %d.%d.%d%s à %d.%d.%d%s
 french.UpdatingIoBroker=Mise à jour de JS-Controller de la version %d.%d.%d%s à %d.%d.%d%s en cours ...
 french.UpdatingFailedIoBroker=La mise à jour d'ioBroker a échoué. Après avoir cliqué sur OK, le fichier journal sera affiché. Vérifiez-le et trouvez la raison de l'échec. L'installateur sera fermé.
+french.ExpertMaintainServerAlphaBeta=Alpha/Beta (@next)

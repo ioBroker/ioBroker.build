@@ -155,3 +155,4 @@ polish.InstallIoBrokerUpdate=Aktualizuj ioBrokera (JS-Controller) z wersji %d.%d
 polish.SummaryInstallIoBrokerUpdate=ioBroker (JS-Controller) zostanie zaktualizowany z wersji %d.%d.%d%s do %d.%d.%d%s
 polish.UpdatingIoBroker=Aktualizowanie JS-Controllera z wersji %d.%d.%d%s do %d.%d.%d%s ...
 polish.UpdatingFailedIoBroker=Aktualizacja ioBrokera nie powiodła się. Po kliknięciu przycisku OK zostanie wyświetlony plik dziennika. Sprawdź go i znajdź przyczynę niepowodzenia. Instalator zostanie zamknięty.
+polish.ExpertMaintainServerAlphaBeta=Alpha/Beta (@next)

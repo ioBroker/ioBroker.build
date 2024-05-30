@@ -155,3 +155,4 @@ russian.InstallIoBrokerUpdate=Обновить ioBroker (JS-Controller) с ве�
 russian.SummaryInstallIoBrokerUpdate=ioBroker (JS-Controller) будет обновлен с версии %d.%d.%d%s до %d.%d.%d%s
 russian.UpdatingIoBroker=Обновление JS-Controller с версии %d.%d.%d%s до %d.%d.%d%s ...
 russian.UpdatingFailedIoBroker=Обновление ioBroker не удалось. После нажатия OK будет отображен файл журнала. Проверьте его и найдите причину сбоя. Установщик будет закрыт.
+russian.ExpertMaintainServerAlphaBeta=Alpha/Beta (@next)

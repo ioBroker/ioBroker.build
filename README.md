@@ -35,6 +35,12 @@ Pre-requires:
 
 ## Changelog
 
+### **WORK IN PROGRESS**
+
+- (Gaspode) Make fixer after JS-Controller Upgrade optional
+- (Gaspode) Offer Alpha and Beta updates (@next) of JS-Controller in expert mode
+- (Gaspode) Allow JS-Controller downgrade to current version in expert mode
+
 # 3.2.0 (23.05.2024)
 
 - (Gaspode) Execute fixer after JS-Controller Upgrade (required for JS-Controller 6)

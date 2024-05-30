@@ -155,3 +155,4 @@ german.InstallIoBrokerUpdate=ioBroker (JS-Controller) aktualisieren von Version 
 german.SummaryInstallIoBrokerUpdate=JS-Controller wird von Version %d.%d.%d%s auf %d.%d.%d%s aktualisiert
 german.UpdatingIoBroker=Aktualisiere JS-Controller von Version %d.%d.%d%s auf %d.%d.%d%s ...
 german.UpdatingFailedIoBroker=Aktualisierung von ioBroker fehlgeschlagen. Wenn Du auf OK klickst, wird das Log file angezeigt. Bitte überprüfe es und beseitige die Ursache für das Installationsproblem. Der ioBroker Installer wird beendet.
+german.ExpertMaintainServerAlphaBeta=Alpha/Beta (@next)
