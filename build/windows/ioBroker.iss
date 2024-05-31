@@ -3486,7 +3486,7 @@ begin
     end
     else begin
       if iobversionMajor > 0 then begin
-        Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepIoBroker'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, appInstPath]);
+        Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepIoBroker'), [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix, appInstPath]);
       end
       else begin
         Result := Result + NewLine + Space + Format(CustomMessage('SummaryKeepIoBrokerProbably'), [appInstPath]);
