@@ -277,6 +277,7 @@ var
   iobVersionNewMinor: Integer;  // Minor Version of the currently available iob server version
   iobVersionNewPatch: Integer;  // Patch Version of the currently available iob server version
   iobVersionNewPostfix: String; // Version postfix of the currently available iob server version if it is an alpha or beta version
+  iobRepository: String;        // Used ioBroker repository for update/upgrade
 
   iobServiceExists: Boolean;     // True if a windows service with service name 'iobServiceName' already exists
   iobInstalled: Boolean;         // True if an ioBroker installation was found and verified in the currently handled path
@@ -1127,32 +1128,48 @@ end;
 
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-procedure gatherNewestIoBrokerVersion(var major: Integer; var minor: Integer; var patch: Integer; var postfix: String);
+procedure gatherNewestIoBrokerVersion(var major: Integer; var minor: Integer; var patch: Integer; var postfix: String; var repo: String);
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
+  resultString: String;
+  resultStrings: TArrayOfString;
   versionString: String;
   nodeJsEx: String;
   ioBrokerEx: String;
+  curstringNo: Integer;
   curPos: Integer;
 begin
   major := 0;
   minor := 0;
   patch := 0;
   postfix := '';
+  repo := '?';
   if (nodePath <> '') then begin
     if not exoMaintainServerAlphaBetaCB.Checked then begin
       nodeJsEx := nodePath + '\node.exe';
       ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
-      versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" update | find "Controller ""js-controller"":"', True, nodePath, '');
-      if (versionString <> '') then begin
-        curPos := pos('Controller "js-controller": ', versionString) + 28;
-        versionString := Trim(Copy(versionString, curPos, Length(versionString) - curPos));
-        curPos := pos(' ', versionString);
-        if (curPos > 0) then begin
-          versionString := Trim(Copy(versionString, 1, curPos-1));
-          Log(Format('Latest ioBroker version: %s', [versionString]));
-          convertVersion(versionString, major, minor, patch, postfix);
-          Log(Format('Latest ioBroker version: %d, %d, %d%s', [major, minor, patch, postfix]));
+      resultString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" update', True, nodePath, '');
+      if (resultString <> '') then begin
+        explode(resultStrings, Trim(resultString), chr(10));
+        for curStringNo := 0 to GetArrayLength(resultStrings)-1 do begin
+          curPos := pos('Controller "js-controller": ', resultStrings[curStringNo]);
+          if (curPos > 0) then begin
+            curPos := curPos + 28;
+            versionString := Trim(Copy(resultStrings[curStringNo], curPos, Length(resultStrings[curStringNo]) - curPos));
+            curPos := pos(' ', versionString);
+            versionString := Trim(Copy(versionString, 1, curPos-1));
+            Log(Format('Latest ioBroker version: %s', [versionString]));
+            convertVersion(versionString, major, minor, patch, postfix);
+            Log(Format('Latest ioBroker version: %d, %d, %d%s', [major, minor, patch, postfix]));
+          end
+          else begin
+            curPos := pos('Used repository: ', resultStrings[curStringNo]);
+            if (curPos > 0) then begin
+              curPos := curPos + 17;
+              repo := Trim(Copy(resultStrings[curStringNo], curPos, Length(resultStrings[curStringNo]) - curPos));
+              Log(Format('Used repository: %s', [repo]));
+            end;
+          end;
         end;
       end
       else begin
@@ -1160,6 +1177,7 @@ begin
       end;
     end
     else begin
+      repo := 'alpha (@next)';
       versionString := execAndReturnOutput('"' + nodepath + '\npm" view iobroker.js-controller@next version', True, nodePath, '');
       if versionString <> '' then begin
         convertVersion(versionString, major, minor, patch, postfix);
@@ -1173,12 +1191,43 @@ begin
 end;
 
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
-function gatherIoBrokerInfo: Boolean;
+function gatherInstalledIoBrokerVersion(var major: Integer; var minor: Integer; var patch: Integer; var postfix: String): Boolean;
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 var
   ioBrokerEx: String;
   nodeJsEx: String;
   versionString: String;
+begin
+  Result := False;
+
+  major := 0;
+  minor := 0;
+  patch := 0;
+  postfix := '';
+
+  ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
+  if (FileExists(ioBrokerEx)) then begin
+    Result := True;
+    if (nodePath <> '') then begin
+      nodeJsEx := nodePath + '\node.exe';
+      versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" --version', False, nodePath, '');
+      if (convertVersion(versionString, major, minor, patch, postfix)) then begin
+        Log(Format('Found ioBroker version: %d, %d, %d, %s', [major, minor, patch, postfix]));
+      end;
+    end
+    else begin
+      iobControllerFoundNoNode := True;
+      Log('ioBroker.js-controller found, but Node.js not found.');
+    end;
+  end
+  else begin
+    Log('ioBroker.js-controller not found.');
+  end;
+end;
+
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
+function gatherIoBrokerInfo: Boolean;
+{--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   Result := False;
   iobVersionMajor := 0;
@@ -1190,25 +1239,12 @@ begin
   iobVersionNewMinor := 0;
   iobVersionNewPatch := 0;
   iobVersionNewPostfix := ''
+  iobRepository := '';
 
-  ioBrokerEx := appInstPath + '\node_modules\iobroker.js-controller/iobroker.js';
-  if (FileExists(ioBrokerEx)) then begin
-    Result := True;
-    if (nodePath <> '') then begin
-      nodeJsEx := nodePath + '\node.exe';
-      versionString := execAndReturnOutput('"' + nodeJsEx + '" "' + ioBrokerEx + '" --version', False, nodePath, '');
-      if (convertVersion(versionString, iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix)) then begin
-        Log(Format('Found ioBroker version: %d, %d, %d, %s', [iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix]));
-        gatherNewestIoBrokerVersion(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix);
-      end;
-    end
-    else begin
-      iobControllerFoundNoNode := True;
-      Log('ioBroker.js-controller found, but Node.js not found.');
-    end;
-  end
-  else begin
-    Log('ioBroker.js-controller not found.');
+  Result := gatherInstalledIoBrokerVersion(iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix);
+
+  if iobVersionMajor > 0 then begin
+    gatherNewestIoBrokerVersion(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix, iobRepository);
   end;
 
   if expertCB.Checked and exoNewServerRB.Checked then begin
@@ -1745,7 +1781,9 @@ begin
 
   sumInfo3NodeLabel.Caption := Format(CustomMessage('NodeRecommended'), [rcmdNodeVersionMajor, rcmdNodeVersionMinor, rcmdNodeVersionPatch]);
 
+
   if iobVersionMajor = 0 then begin
+    summaryPage.Description := '';
     if iobControllerFoundNoNode then begin
       sumInfo1IoBrokerLabel.Font.Color := clBlue;
       sumInfo1IoBrokerLabel.Caption := '?';
@@ -1758,6 +1796,7 @@ begin
     end
   end
   else begin
+    summaryPage.description := Format(CustomMessage('UsedRepo'), [iobRepository]);
     if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch,  iobVersionNewPostfix,
                         iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix) > 0) then begin
       sumInfo1IoBrokerLabel.Font.Color := $00A5FF;
@@ -1938,7 +1977,7 @@ begin
                                                                                            iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
       optInstallIoBrokerCB.Enabled := True;
 
-      optFixIoBrokerCB.checked := False;
+      optFixIoBrokerCB.checked := True;
       optFixIoBrokerCB.Caption := ' ' + Format(CustomMessage('FixIoBroker'),[appInstPath]);
       optFixIoBrokerCB.Enabled := True;
     end
@@ -2712,7 +2751,15 @@ begin
     gatherInstNodeData;
     if isIobUpdate then begin
       if not exoMaintainServerAlphaBetaCB.Checked then begin
-        cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" upgrade self';
+        if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix,
+                            iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix) < 0) and (iobVersionNewMajor > 0)
+        then begin
+          // To downgrade we can not use iob ubgrade self
+          cmd := Format('"' + nodePath + '\npm" i iobroker.js-controller@%d.%d.%d%s --omit=dev --yes', [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
+        end
+        else begin
+          cmd := '"' + nodePath + '\node.exe" "' + appInstPath + '\node_modules\iobroker.js-controller/iobroker.js" upgrade self';
+        end;
       end
       else begin
         cmd := '"' + nodePath + '\npm" i iobroker.js-controller@next --omit=dev --yes';
@@ -2747,13 +2794,13 @@ begin
       if execAndStoreOutput(cmd , logName, nodePath, appInstPath) then begin
         if isIobUpdate then begin
           // In this case no instDone file is created, we have to verify the success in another way:
-          gatherNewestIoBrokerVersion(majorV, minorV, patchV, postfixV);
+          gatherInstalledIoBrokerVersion(majorV, minorV, patchV, postfixV);
           Result := compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix, majorV, minorV, patchV, postfixV) = 0;
           Log('ioBroker JS-Controller update done!');
           SaveStringToFile(logName,
                           '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
                           'JS-Controller Update done.' + chr(13) + chr(10) +
-                          Format('Verification: Latest JS-Controller: %d.%d.%d%s, installed: %d.%d.%d%s', [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix, majorV, minorV, patchV, postfixV]) + chr(13) + chr(10) +
+                          Format('Verification: Traget JS-Controller: %d.%d.%d%s, installed: %d.%d.%d%s', [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix, majorV, minorV, patchV, postfixV]) + chr(13) + chr(10) +
                           '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
 
           if Result and optFixIoBrokerCB.Checked then begin

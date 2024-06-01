@@ -156,3 +156,5 @@ portuguese.SummaryInstallIoBrokerUpdate=ioBroker (JS-Controller) será atualizad
 portuguese.UpdatingIoBroker=Atualizando JS-Controller da versão %d.%d.%d%s para %d.%d.%d%s ...
 portuguese.UpdatingFailedIoBroker=A atualização do ioBroker falhou. Após clicar em OK, o arquivo de log será exibido. Verifique e encontre o motivo da falha. O instalador será fechado.
 portuguese.ExpertMaintainServerAlphaBeta=Alpha/Beta (@next)
+portuguese.ExpertMaintainServerAlphaBeta=Alpha Repo (@next)
+portuguese.UsedRepo=Repository: %s

@@ -155,4 +155,5 @@ ukrainian.InstallIoBrokerUpdate=Оновити ioBroker (JS-Controller) з ве�
 ukrainian.SummaryInstallIoBrokerUpdate=ioBroker (JS-Controller) буде оновлено з версії %d.%d.%d%s на %d.%d.%d%s
 ukrainian.UpdatingIoBroker=Оновлення JS-Controller з версії %d.%d.%d%s на %d.%d.%d%s ...
 ukrainian.UpdatingFailedIoBroker=Оновлення ioBroker не вдалося. Після натискання кнопки OK буде відображений файл журналу. Перевірте його і знайдіть причину невдачі. Інсталятор буде закритий.
-ukrainian.ExpertMaintainServerAlphaBeta=Alpha/Beta (@next)
+ukrainian.ExpertMaintainServerAlphaBeta=Alpha (@next)
+ukrainian.UsedRepo=Repository: %s
