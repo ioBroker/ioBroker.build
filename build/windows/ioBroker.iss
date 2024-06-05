@@ -38,7 +38,7 @@
 ; -                     (required for JS-Controller 6)                                         -
 ; - 29.05.2024 Gaspode: Make fixer after JS-Controller Upgrade optional                        -
 ; - 29.05.2024 Gaspode: Offer Alpha and Beta updates (@next) of JS-Controller in expert mode   -
-; - 30.05.2024 Gaspode: Allow JS-Controller downgrade to current version in expert mode        -
+; - 30.05.2024 Gaspode: Allow JS-Controller downgrade to current version                       -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -1819,17 +1819,14 @@ begin
     end
     else begin
       if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix,
-                          iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix) > 0) then begin
-        sumInfo2IoBrokerNewestLabel.Caption := Format(CustomMessage('IoBrokerNewestNewer'), [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
+                          iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix) <> 0) then begin
+        sumInfo2IoBrokerNewestLabel.Caption := Format(CustomMessage('IoBrokerNewestNewer'), [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix, iobRepository]);
       end
       else begin
         if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix,
                             iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix) = 0) then begin
           sumInfo2IoBrokerNewestLabel.Caption := CustomMessage('IoBrokerNewestOK');
         end
-        else begin
-          sumInfo2IoBrokerNewestLabel.Caption := Format(CustomMessage('IoBrokerNewest'), [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
-        end;
       end;
     end;
   end;
@@ -1969,9 +1966,9 @@ begin
     if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix,
                         iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix) > 0) or
        (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix,
-                        iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix) < 0) and expertCB.Checked
+                        iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix) < 0)
         then begin
-      // JS-Controller update available, if expert mode is enabled, we also offer downgrade
+      // JS-Controller update available, we also offer downgrade
       optInstallIoBrokerCB.checked := True;
       optInstallIoBrokerCB.Caption := ' ' + Format(CustomMessage('InstallIoBrokerUpdate'),[iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix,
                                                                                            iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
