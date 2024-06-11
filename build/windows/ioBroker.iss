@@ -2748,10 +2748,12 @@ begin
     gatherInstNodeData;
     if isIobUpdate then begin
       if not exoMaintainServerAlphaBetaCB.Checked then begin
-        if (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix,
+        if (iobVersionNewPostfix <> '') or
+           (iobVersionPostfix <> '') or
+           (compareVersions(iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix,
                             iobVersionMajor, iobVersionMinor, iobVersionPatch, iobVersionPostfix) < 0) and (iobVersionNewMajor > 0)
         then begin
-          // To downgrade we can not use iob ubgrade self
+          // To downgrade or to switch from or to alpha version we can not use iob ubgrade self
           cmd := Format('"' + nodePath + '\npm" i iobroker.js-controller@%d.%d.%d%s --omit=dev --yes', [iobVersionNewMajor, iobVersionNewMinor, iobVersionNewPatch, iobVersionNewPostfix]);
         end
         else begin
