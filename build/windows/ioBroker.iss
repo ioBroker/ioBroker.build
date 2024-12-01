@@ -39,6 +39,7 @@
 ; - 29.05.2024 Gaspode: Make fixer after JS-Controller Upgrade optional                        -
 ; - 29.05.2024 Gaspode: Offer Alpha and Beta updates (@next) of JS-Controller in expert mode   -
 ; - 30.05.2024 Gaspode: Allow JS-Controller downgrade to current version                       -
+; - 01.12.2024 Gaspode: Remove also WinSW3.exe during deinstallation                           -
 ; -                                                                                            -
 ; ----------------------------------------------------------------------------------------------
 #define MyAppName "ioBroker automation platform"
@@ -147,6 +148,7 @@ Type: filesandordirs; Name: "{app}\install"
 Type: filesandordirs; Name: "{app}\log"
 Type: filesandordirs; Name: "{app}\semver"
 Type: filesandordirs; Name: "{app}\iobroker-data_old"
+Type: filesandordirs; Name: "{app}\WinSW3.exe"
 
 [Registry]
 Root: HKLM; Subkey: "Software\ioBroker"; Flags: uninsdeletekey dontcreatekey
@@ -763,15 +765,15 @@ begin
 
   if myLogFileName <> '' then begin
     logPart := ' >> "' + myLogFileName + '" 2>>&1';
+    SaveStringToFile(myLogFileName, chr(13) + chr(10) + 'Executing:' + chr(13) + chr(10) +
+                                    '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
+                                    myCmd + chr(13) + chr(10) +
+                                    '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), true);
+
   end
   else begin
     logPart := '';
   end;
-
-  SaveStringToFile(myLogFileName, chr(13) + chr(10) + 'Executing:' + chr(13) + chr(10) +
-                                  '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
-                                  myCmd + chr(13) + chr(10) +
-                                  '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), true);
 
   if (SaveStringToFile(tmpBatFileName, myCmd, false)) then begin
     if (Exec(ExpandConstant('{cmd}'), '/C ' + tmpBatFileName + logPart, wrkDir, SW_HIDE, ewWaitUntilTerminated, resultCode)) then begin
@@ -3338,6 +3340,7 @@ begin
         DeleteFile(appInstPath + '\LICENSE');
         DeleteFile(appInstPath + '\.env');
         DeleteFile(appInstPath + '\instDone');
+        DeleteFile(appInstPath + '\WinSW3.exe');
         marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\daemon']));
         DelTree(appInstPath + '\daemon', True, True, True);
         marqueePage.SetText(CustomMessage('Uninstall'), Format(CustomMessage('Deleting'), [appInstPath + '\node_modules']));
