@@ -90,6 +90,7 @@ Name: "{group}\ioBroker Setup"; Filename: "{app}\ioBrokerInstaller.exe"; IconFil
 [Files]
 Source: "resource\{#MyAppIcon}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{srcexe}"; DestDir: "{app}"; DestName: "ioBrokerInstaller.exe"; Flags: external overwritereadonly replacesameversion
+Source: "fix-favicon-path.js"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Do not display required disk space:
 [Messages]
@@ -2846,7 +2847,16 @@ begin
                             '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10) +
                             'ioBroker installation/fixing completed!' + chr(13) + chr(10) +
                             '----------------------------------------------------------------------------------------------------' + chr(13) + chr(10), True);
-              Result := checkIoBrokerRunning(info, logName);
+            
+            // Fix favicon path from www/favicon.ico to adminWww/favicon.ico
+            if nodePath <> '' then begin
+              cmd := '"' + nodePath + '\node.exe" "' + ExpandConstant('{app}') + '\fix-favicon-path.js"';
+              execAndStoreOutput(cmd, logName, nodePath, appInstPath);
+              Log('Executed favicon path fix script');
+              SaveStringToFile(logName, 'Executed favicon path fix script' + chr(13) + chr(10), True);
+            end;
+            
+            Result := checkIoBrokerRunning(info, logName);
           end
           else begin
             Log('ioBroker installation/fixing did not run til the end!');
