@@ -35,6 +35,10 @@ Pre-requires:
 
 ## Changelog
 
+# 3.3.1 (01.12.2024)
+
+- (Gaspode) Remove WinSW3.exe during deinstallation
+
 # 3.3.0 (23.05.2024)
 
 - (Gaspode) Make fixer after JS-Controller Upgrade optional
