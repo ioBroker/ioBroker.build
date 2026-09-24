@@ -72,12 +72,12 @@ function execute(cmd: string, options?: { cwd?: string }): Promise<number> {
 async function runMsi(): Promise<void> {
     await checkFiles(['build/windows/ioBroker.iss', 'build/windows/resource/ioBroker.ico']);
 
-    // The compiler is not installed on the build machine: `build/windows/InnoSetup6` is a portable
+    // The compiler is not installed on the build machine: `build/windows/InnoSetup7` is a portable
     // copy of Inno Setup (https://jrsoftware.org/isdl.php) committed to this repository. See the
     // "InnoSetup" chapter of README.md for how to update it.
     // ISCC resolves the relative `#include`s of the .iss file against its working directory
     const cwd = `${__dirname.replace(/\\/g, '/')}/build/windows/`;
-    const cmd = `"${__dirname}\\build\\windows\\InnoSetup6\\ISCC.exe" "${__dirname}\\build\\windows\\ioBroker.iss"`;
+    const cmd = `"${__dirname}\\build\\windows\\InnoSetup7\\ISCC.exe" "${__dirname}\\build\\windows\\ioBroker.iss"`;
     console.log(`"${cmd} in ${cwd}`);
 
     const code = await execute(cmd, { cwd });

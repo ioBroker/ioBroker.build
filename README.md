@@ -49,41 +49,45 @@ npm run build
 
 The compiler is **not installed** on the build machine, it is committed to this repository:
 
-| Folder                      | Tool                                                    | Bundled version        |
-|-----------------------------|---------------------------------------------------------|------------------------|
-| `build/windows/InnoSetup6/` | Inno Setup, called as `ISCC.exe` (command line compiler) | 6.2.1 (2022-04-14)     |
-| `build/windows/ezsign/`     | EZSignIt, used by `npm run 4-sign` only                  | 4.01                   |
+| Folder                      | Tool                                                    | Bundled version    |
+|-----------------------------|---------------------------------------------------------|--------------------|
+| `build/windows/InnoSetup7/` | Inno Setup, called as `ISCC.exe` (command line compiler) | 7.1.0 (2026-08-12) |
+| `build/windows/ezsign/`     | EZSignIt, used by `npm run 4-sign` only                  | 4.01               |
 
 So `npm install` and `npm run build` are all a Windows machine needs, and the GitHub action does not
 have to install anything either.
 
 - Download page (all versions): https://jrsoftware.org/isdl.php
 - Releases and source code: https://github.com/jrsoftware/issrc
-- License of the bundled copy: `build/windows/InnoSetup6/license.txt`
+- License of the bundled copy: `build/windows/InnoSetup7/license.txt`
 
 `ISCC.exe` reads `build/windows/ioBroker.iss` and needs these files from the same folder:
 
 - `ISCmplr.dll` and `ISPP.dll` — the preprocessor, because the script works with `#define`/`#include`
-- `Setup.e32`, `SetupLdr.e32` and the compression DLLs (`islzma*`, `is*zip`, `is*zlib`) — they are
-  built into the produced .exe
+- `Setup.e32` and `SetupLdr.e32` plus the compression DLLs (`islzma*`, `is7z*`, `is*zip`, `is*zlib`) —
+  they are built into the produced .exe. The `*.e64` files are only needed for 64-bit installers;
+  this script builds a 32-bit one (`SetupArchitecture` is not set, and 32-bit is the default in
+  Inno Setup 7 as well)
+- the `*.issig` files — Inno Setup 7 verifies its own modules against them and logs
+  "Verification successful" while compiling, so do not delete them
 - `Default.isl` and `Languages\*.isl` — the `[Languages]` section references them as `compiler:...`
 
 The .exe files carry no version resource (`0.0.0.0`), so the version of the bundled copy is best read
-from the first `<span class="ver">` entry in `build/windows/InnoSetup6/whatsnew.htm`.
+from the first `<span class="ver">` entry in `build/windows/InnoSetup7/whatsnew.htm`.
 
 ### How to update InnoSetup
 
-1. Take the current release of the **6.x** line from https://jrsoftware.org/isdl.php, e.g.
-   https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe
+1. Take the current release of the **7.x** line from https://jrsoftware.org/isdl.php, e.g.
+   https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe
 
 2. Install it into a temporary folder in **portable mode**, so that it writes nothing into the
    registry and creates no uninstaller:
 
 ```bash
-innosetup-6.7.3.exe /PORTABLE=1 /SILENT /DIR=d:\innosetup-new
+innosetup-7.1.0.exe /PORTABLE=1 /SILENT /DIR=d:\innosetup-new
 ```
 
-3. Replace the content of `build/windows/InnoSetup6` with the content of `d:\innosetup-new`.
+3. Replace the content of `build/windows/InnoSetup7` with the content of `d:\innosetup-new`.
    The folder in the repository was copied from a *normal* installation, so it still contains
    `unins000.exe`, `unins000.dat` and `unins000.msg`. A portable installation does not create them
    and they are not needed — delete them instead of carrying them over.
@@ -102,8 +106,25 @@ npm run build
 
 6. Commit the folder with a changelog entry that names the new Inno Setup version.
 
-Inno Setup 7 exists as well, but `ioBroker.iss` was never compiled with it. Stay on the 6.x line
-until somebody has verified 7.x.
+### Minimum Inno Setup version of the script
+
+`ioBroker.iss` needs **Inno Setup 6.6 or newer** and is compiled with the 7.x line. It no longer
+compiles with 6.2.x, because these two things changed in the meantime:
+
+- `CreateCustomForm` takes the client size and the two `KeepSize` flags as parameters since 6.6
+  (they are read-only properties afterwards). Used once, for the "checking for updates" box.
+- the support function `FileCopy` was renamed to `CopyFile`.
+
+Two more differences between 6.2 and 7.x were checked and handled:
+
+- `AppVerName` defaults to `<AppName> <AppVersion>` in 7 instead of the localized
+  `<AppName> version <AppVersion>`. The script now sets it explicitly to keep the old wording.
+- `Round` returns `Int64` instead of `LongInt`. The script assigns its result to `Integer` variables
+  and passes it to `Format` with `%d` (the Node.js download URLs), which was verified to still
+  produce the same values.
+
+`TimeStampsInUTC` now defaults to `yes`, which changes the time stamps of the two installed files and
+of the paths in Setup's log. This was left at the new default.
 
 ### EZSignIt
 

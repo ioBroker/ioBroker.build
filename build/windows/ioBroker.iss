@@ -63,6 +63,10 @@
 AppId={{97DA02F5-2E8C-4B96-BB42-61ED2BBF34DF}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+; Inno Setup 7 changed the default of AppVerName from "<AppName> version <AppVersion>" to
+; "<AppName> <AppVersion>". Keep the old, localized wording (it is what the entry in
+; "Apps & features" and the welcome page show).
+AppVerName={cm:NameAndVersion,{#MyAppName},{#MyAppVersion}}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}
@@ -372,7 +376,7 @@ function DownloadTemporaryFileAndCopy(const Url, FileName, RequiredSHA256OfFile:
 {--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------}
 begin
   Result := DownloadTemporaryFile(Url, FileName, RequiredSHA256OfFile, OnDownloadProgress);
-  if FileCopy(ExpandConstant('{tmp}') + '\' + FileName, getTempPath + '\' + FileName, False) then begin
+  if CopyFile(ExpandConstant('{tmp}') + '\' + FileName, getTempPath + '\' + FileName, False) then begin
     Log('Copied downloaded file to ' + getTempPath + '\' + FileName);
   end;
 end;
@@ -800,7 +804,7 @@ begin
             SourceFilePath := SourcePath + '\' + FindRec.Name;
             DestFilePath := DestPath + '\' + FindRec.Name;
             if FindRec.Attributes and FILE_ATTRIBUTE_DIRECTORY = 0 then begin
-              if FileCopy(SourceFilePath, DestFilePath, False) then begin
+              if CopyFile(SourceFilePath, DestFilePath, False) then begin
                 Log(Format('Copied %s to %s', [SourceFilePath, DestFilePath]));
                 marqueePage.setText(CustomMessage('Copying'), Format('%s', [DestFilePath]));
 
@@ -2305,12 +2309,20 @@ begin
     sumRetryButton := TButton.Create(WizardForm);
     with sumRetryButton do begin
       Parent := summaryPage.Surface;
-      Top := sumSummaryLabel.Top + sumSummaryLabel.Height + ScaleY(2);
       Width := ScaleX(100);
       Height := ScaleY(30);
+      // Anchored to the bottom of the page, not stacked below the summary text. The labels above
+      // are auto-sized (their height follows the wizard font, not the assigned Height), so a fixed
+      // chain of Tops pushes the button off the page as soon as the font grows - which is what
+      // happened with the Segoe UI 9 of Inno Setup 7 and, even worse, with the Tahoma 8 before.
+      // The page surface does not scroll, so anything below its lower edge is simply invisible.
+      Top := summaryPage.SurfaceHeight - Height;
       Caption := CustomMessage('CheckAgain');
       OnClick := @retryTestReady;
     end;
+
+    // The summary text gets whatever is left between the last check line and the button
+    sumSummaryLabel.Height := sumRetryButton.Top - sumSummaryLabel.Top - ScaleY(4);
 
     // Controls options page -----------------------------------------------------------------------------------
     optInstallNodeCB := TCheckBox.Create(WizardForm);
@@ -3037,10 +3049,10 @@ begin
     // Check for installer update:
     // If any error occurs we go on silently, because there is no need to bother the user with info about a failed update check.
     try
-      infoForm := CreateCustomForm;
+      // Client size and the two KeepSize flags are passed upfront and are read only afterwards
+      // (signature of CreateCustomForm changed with Inno Setup 6.6)
+      infoForm := CreateCustomForm(ScaleX(250), ScaleY(100), False, False);
       with infoForm do begin
-        ClientWidth := ScaleX(250);
-        ClientHeight := ScaleY(100);
         Caption := 'ioBroker - Automate your life';
         Position := poMainFormCenter;
         Color := clWhite;
@@ -3107,7 +3119,7 @@ begin
                         tmpExecFinalPath := ExpandConstant('{%TEMP}') + '\~iobInst' + installedVersionStr + '#' + onlineVersionStr + '.exe';
 
                         //
-                        if (FileCopy(tmpExecTmpPath, tmpExecFinalPath, False)) and (FileExists(tmpExecFinalPath)) then begin
+                        if (CopyFile(tmpExecTmpPath, tmpExecFinalPath, False)) and (FileExists(tmpExecFinalPath)) then begin
                           Log('Update check: Temporary Installer file at ' + tmpExecFinalPath);
 
                           MsgBox(Format(CustomMessage('StartInstaller'), [onlineVersionStr]), mbConfirmation, mb_OK or MB_SETFOREGROUND);
@@ -4110,7 +4122,7 @@ begin
     for i := 0 To stringList.Count-1 do begin
       stringArray[i] := stringList[i];
     end;
-    FileCopy(appInstPath + '\iobroker-data\iobroker.json', appInstPath + '\iobroker-data\iobroker.json_backup', False);
+    CopyFile(appInstPath + '\iobroker-data\iobroker.json', appInstPath + '\iobroker-data\iobroker.json_backup', False);
     Result := SaveStringsToFile(appInstPath + '\iobroker-data\iobroker.json', stringArray, false);
     Log('Saved ' + appInstPath + '\iobroker-data\iobroker.json');
     resultStr := resultStr + 'Saved ' + appInstPath + '\iobroker-data\iobroker.json ' + Format('Result: %d', [Result]) + chr(13) + chr(10);
