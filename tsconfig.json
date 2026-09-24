@@ -1,0 +1,23 @@
+// Powers editor support and type checking for tasks.ts. It never emits: there is nothing to compile
+// here, `tsx` runs the tasks directly.
+{
+    "compilerOptions": {
+        "target": "esnext",
+        "lib": ["esnext"],
+        "module": "node16",
+        "moduleResolution": "node16",
+        "resolveJsonModule": true,
+        "noEmit": true,
+        "strict": true,
+        "noImplicitOverride": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "skipLibCheck": true,
+        "newLine": "lf",
+        "types": ["node"]
+    },
+    "include": ["tasks.ts"],
+    "exclude": ["node_modules/**", "build/**", "delivery/**", "tmp/**"]
+}
